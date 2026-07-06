@@ -26,8 +26,8 @@ impl Rgb {
         };
         match h.len() {
             6 => {
-                let n = u32::from_str_radix(h, 16)
-                    .map_err(|_| format!("invalid hex color: {s}"))?;
+                let n =
+                    u32::from_str_radix(h, 16).map_err(|_| format!("invalid hex color: {s}"))?;
                 Ok(Rgb::new((n >> 16) as u8, (n >> 8) as u8, n as u8))
             }
             3 => {
@@ -43,6 +43,9 @@ impl Rgb {
         }
     }
 
+    // Coefficients are the canonical Oklab matrices, kept at their published
+    // precision for provenance; f32 rounds them to the nearest representable value.
+    #[allow(clippy::excessive_precision)]
     pub fn to_oklab(self) -> Oklab {
         let r = srgb_to_linear(self.r);
         let g = srgb_to_linear(self.g);
@@ -82,6 +85,7 @@ impl Oklab {
         }
     }
 
+    #[allow(clippy::excessive_precision)]
     pub fn to_rgb(self) -> Rgb {
         let l_ = self.l + 0.3963377774 * self.a + 0.2158037573 * self.b;
         let m_ = self.l - 0.1055613458 * self.a - 0.0638541728 * self.b;

@@ -59,8 +59,19 @@ impl Gradient {
     /// Names of all built-in presets, in display order.
     pub fn preset_names() -> &'static [&'static str] {
         &[
-            "sunset", "ocean", "fire", "mint", "grape", "cyberpunk", "gold", "ice",
-            "vaporwave", "rainbow", "matrix", "flamingo", "mono",
+            "sunset",
+            "ocean",
+            "fire",
+            "mint",
+            "grape",
+            "cyberpunk",
+            "gold",
+            "ice",
+            "vaporwave",
+            "rainbow",
+            "matrix",
+            "flamingo",
+            "mono",
         ]
     }
 }
@@ -90,7 +101,9 @@ impl Direction {
             "horizontal" | "h" => Ok(Direction::Horizontal),
             "vertical" | "v" => Ok(Direction::Vertical),
             "diagonal" | "d" => Ok(Direction::Diagonal),
-            _ => Err(format!("unknown direction: {s} (horizontal|vertical|diagonal)")),
+            _ => Err(format!(
+                "unknown direction: {s} (horizontal|vertical|diagonal)"
+            )),
         }
     }
 }
