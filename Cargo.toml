@@ -1,0 +1,23 @@
+[package]
+name = "sigil"
+version = "0.1.0"
+edition = "2021"
+description = "Give your CLI a face — modern gradient ASCII banners for your projects."
+license = "MIT"
+
+[[bin]]
+name = "sigil"
+path = "src/main.rs"
+
+[lib]
+name = "sigil"
+path = "src/lib.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+figlet-rs = "0.1"
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
