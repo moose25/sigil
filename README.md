@@ -18,6 +18,7 @@ cargo run -- "My Project" --gradient sunset
 sigil "Hello" --gradient ocean --direction diagonal --align center
 sigil "Ship it" --colors "#ff5f6d,#ffc371"   # custom gradient stops
 sigil "Deploy" --font ansishadow             # pick a font
+echo "From stdin" | sigil                     # or pipe the text in
 sigil gradients                               # preview all presets
 sigil fonts                                   # preview all fonts
 sigil "plain" --no-color                      # respects NO_COLOR too
@@ -26,7 +27,7 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 ### Options
 
 | Flag | Description | Default |
-|------|-------------|---------|
+| ---- | ----------- | ------- |
 | `-g, --gradient <name>` | Named preset (see `sigil gradients`) | `ocean` |
 | `-c, --colors <hex,...>` | Custom gradient stops, e.g. `#ff5f6d,#ffc371` | — |
 | `-d, --direction <dir>` | `horizontal` \| `vertical` \| `diagonal` | `horizontal` |

@@ -1,4 +1,4 @@
-use std::io::IsTerminal;
+use std::io::{IsTerminal, Read};
 use std::path::Path;
 
 use clap::{Parser, Subcommand};
@@ -89,13 +89,33 @@ fn run(cli: Cli) -> Result<(), String> {
         Some(Command::Gradients) => list_gradients(mode),
         Some(Command::Fonts) => list_fonts(mode),
         None => {
-            let text = cli
-                .text
-                .as_deref()
-                .ok_or("no text given. Try: sigil \"My Project\"  (or `sigil --help`)")?;
-            render_banner(&cli, text)
+            let text = resolve_text(cli.text.as_deref())?;
+            render_banner(&cli, &text)
         }
     }
+}
+
+/// Determine the banner text: the positional argument, or stdin when it is
+/// piped/redirected. Whitespace (including newlines) is collapsed to single
+/// spaces so piped input renders as one line.
+fn resolve_text(arg: Option<&str>) -> Result<String, String> {
+    if let Some(t) = arg {
+        return Ok(t.to_string());
+    }
+    if std::io::stdin().is_terminal() {
+        return Err(
+            "no text given. Try: sigil \"My Project\"  or pipe it: echo hi | sigil".to_string(),
+        );
+    }
+    let mut buf = String::new();
+    std::io::stdin()
+        .read_to_string(&mut buf)
+        .map_err(|e| format!("failed to read stdin: {e}"))?;
+    let text = buf.split_whitespace().collect::<Vec<_>>().join(" ");
+    if text.is_empty() {
+        return Err("no text on stdin".to_string());
+    }
+    Ok(text)
 }
 
 fn render_banner(cli: &Cli, text: &str) -> Result<(), String> {
