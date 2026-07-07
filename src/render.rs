@@ -565,6 +565,64 @@ fn push_animated_span(
     out.push_str("</tspan>");
 }
 
+/// Render the banner to PNG bytes, one color block per character cell (a crisp
+/// pixel-style image that needs no font). Honors gradient, borders, shadow,
+/// outline, and background.
+pub fn to_png(
+    banner: &Banner,
+    opts: &RenderOptions,
+    background: Option<Rgb>,
+) -> Result<Vec<u8>, String> {
+    // Cell size in pixels, roughly a terminal cell's 1:2 aspect.
+    const CW: usize = 14;
+    const CH: usize = 28;
+    let grid = compose(banner, opts);
+    let w = grid.width * CW;
+    let h = grid.height * CH;
+    if w == 0 || h == 0 {
+        return Err("nothing to render".into());
+    }
+    let bg = background.unwrap_or(Rgb::new(13, 17, 23));
+
+    // RGB pixel buffer, initialized to the background.
+    let mut px = Vec::with_capacity(w * h * 3);
+    for _ in 0..(w * h) {
+        px.extend_from_slice(&[bg.r, bg.g, bg.b]);
+    }
+    let mut fill = |x0: usize, y0: usize, c: Rgb| {
+        for y in y0..y0 + CH {
+            let base = (y * w + x0) * 3;
+            for x in 0..CW {
+                let i = base + x * 3;
+                px[i] = c.r;
+                px[i + 1] = c.g;
+                px[i + 2] = c.b;
+            }
+        }
+    };
+    for row in 0..grid.height {
+        for col in 0..grid.width {
+            if grid.chars[row][col] == ' ' {
+                continue; // leave the background showing
+            }
+            let c = cell_color(&grid, opts, row, col, 0.0);
+            fill(col * CW, row * CH, c);
+        }
+    }
+
+    let mut out = Vec::new();
+    {
+        let mut enc = png::Encoder::new(&mut out, w as u32, h as u32);
+        enc.set_color(png::ColorType::Rgb);
+        enc.set_depth(png::BitDepth::Eight);
+        let mut writer = enc.write_header().map_err(|e| format!("png error: {e}"))?;
+        writer
+            .write_image_data(&px)
+            .map_err(|e| format!("png error: {e}"))?;
+    }
+    Ok(out)
+}
+
 /// Render the banner as a standalone HTML document: a `<pre>` of colored
 /// `<span>`s, for embedding in web pages, docs, or HTML email.
 pub fn to_html(banner: &Banner, opts: &RenderOptions, background: Option<Rgb>) -> String {
@@ -721,6 +779,15 @@ mod tests {
             set.len()
         };
         assert!(distinct(ColorBy::Char) < distinct(ColorBy::Banner));
+    }
+
+    #[test]
+    fn png_has_valid_signature() {
+        let b = Banner::layout(&font(), "Hi").unwrap();
+        let bytes = to_png(&b, &base_opts(ColorMode::True), None).unwrap();
+        // PNG magic number.
+        assert_eq!(&bytes[..8], &[0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1a, b'\n']);
+        assert!(bytes.len() > 100);
     }
 
     #[test]
