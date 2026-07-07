@@ -221,6 +221,15 @@ enum Command {
     },
     /// Print a man page (roff) to stdout.
     Man,
+    /// Print a random banner and the flags to reproduce it.
+    Random {
+        /// Text to render (default: Sigil).
+        #[arg(value_name = "TEXT")]
+        text: Vec<String>,
+        /// Seed for a reproducible random pick.
+        #[arg(long)]
+        seed: Option<u64>,
+    },
 }
 
 fn main() {
@@ -250,6 +259,7 @@ fn run(cli: Cli) -> Result<(), String> {
             Ok(())
         }
         Some(Command::Man) => print_man(),
+        Some(Command::Random { text, seed }) => random_banner(base_mode(cli.no_color), &text, seed),
         None => {
             // With --art the content comes from a file/stdin, not the positional text.
             let text = if cli.art.is_some() {
@@ -926,6 +936,58 @@ fn init_config(force: bool, print: bool) -> Result<(), String> {
     std::fs::write(&path, sigil::config::STARTER)
         .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
     eprintln!("wrote {}", path.display());
+    Ok(())
+}
+
+/// Render a random banner (font + gradient + maybe a border/shadow) and print
+/// the exact flags to reproduce it.
+fn random_banner(mode: ColorMode, text_args: &[String], seed: Option<u64>) -> Result<(), String> {
+    let text = if text_args.is_empty() {
+        "Sigil".to_string()
+    } else {
+        text_args.join(" ")
+    };
+    let seed = random_seed(seed);
+    let mut rng = SplitMix::new(seed);
+    let font = choose(&font_names(), &mut rng);
+    let gradient = choose(Gradient::preset_names(), &mut rng);
+    let border = choose(&["none", "round", "single", "double", "heavy"], &mut rng);
+    let shadow = rng.next() % 2 == 0;
+
+    let f = fonts::load(&font)?;
+    let banner = Banner::layout(&f, &text)?;
+    let b = Border::parse(&border)?;
+    let opts = RenderOptions {
+        gradient: Gradient::preset(&gradient).unwrap(),
+        direction: Direction::Horizontal,
+        align: Align::Left,
+        mode,
+        target_width: 0,
+        margin_y: 0,
+        margin_x: 0,
+        reverse: false,
+        cycle: 1,
+        border: b,
+        padding: if b.is_some() { (2, 1) } else { (0, 0) },
+        border_color: None,
+        background: None,
+        color_by: ColorBy::Banner,
+        shadow: shadow.then(|| Rgb::new(28, 28, 34)),
+        outline: None,
+        title: None,
+    };
+    print!("{}", paint(&banner, &opts));
+
+    // Reproduce line: explicit flags (deterministic), plus the seed shortcut.
+    let mut cmd = format!("sigil \"{text}\" -f {font} -g {gradient}");
+    if border != "none" {
+        cmd.push_str(&format!(" -b {border}"));
+    }
+    if shadow {
+        cmd.push_str(" --shadow");
+    }
+    println!("\n{}", bold(&cmd, mode));
+    println!("or: sigil random \"{text}\" --seed {seed}");
     Ok(())
 }
 
