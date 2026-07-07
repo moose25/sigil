@@ -1,9 +1,19 @@
 //! Turning text into a colored ASCII banner.
 
 use figlet_rs::FIGfont;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::color::{ColorMode, Rgb};
 use crate::gradient::{Direction, Gradient};
+
+/// Display width of a string in terminal columns (wide glyphs count as 2).
+fn display_width(s: &str) -> usize {
+    UnicodeWidthStr::width(s)
+}
+
+/// Sentinel marking the second column occupied by a preceding wide glyph.
+/// It renders as nothing (the wide glyph already covers both columns).
+pub(crate) const CONT: char = '\0';
 
 /// Horizontal placement of the banner within the target width.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -93,9 +103,10 @@ impl Banner {
             lines.push(String::new());
         }
 
-        let width = lines.iter().map(|l| l.chars().count()).max().unwrap_or(0);
+        // Pad to a common *display* width so lines with wide glyphs still align.
+        let width = lines.iter().map(|l| display_width(l)).max().unwrap_or(0);
         for l in &mut lines {
-            let pad = width - l.chars().count();
+            let pad = width - display_width(l);
             if pad > 0 {
                 l.push_str(&" ".repeat(pad));
             }
@@ -153,8 +164,19 @@ pub fn compose(banner: &Banner, border: Option<Border>, padding: (usize, usize))
     let mut chars = vec![vec![' '; width]; height];
     let mut is_frame = vec![vec![false; width]; height];
     for (r, line) in banner.lines.iter().enumerate() {
-        for (c, ch) in line.chars().enumerate() {
-            chars[oy + r][ox + c] = ch;
+        // Advance by each glyph's display width so wide glyphs occupy two
+        // columns: the glyph itself and a continuation sentinel.
+        let mut col = ox;
+        for ch in line.chars() {
+            let w = UnicodeWidthChar::width(ch).unwrap_or(0);
+            if w == 0 || col >= width {
+                continue;
+            }
+            chars[oy + r][col] = ch;
+            if w == 2 && col + 1 < width {
+                chars[oy + r][col + 1] = CONT;
+            }
+            col += w;
         }
     }
     if let Some(b) = border {
@@ -221,6 +243,9 @@ pub fn paint(banner: &Banner, opts: &RenderOptions) -> String {
         let mut last: Option<Rgb> = None;
         for col in 0..grid.width {
             let ch = grid.chars[row][col];
+            if ch == CONT {
+                continue; // second column of a wide glyph; already drawn
+            }
             if ch == ' ' {
                 out.push(' ');
                 continue;
@@ -266,10 +291,29 @@ mod tests {
     }
 
     #[test]
+    fn wide_glyphs_align_by_display_width() {
+        let banner = Banner {
+            lines: vec!["日x".to_string(), "ab".to_string()],
+            width: 3, // 日(2) + x(1)
+        };
+        let g = compose(&banner, None, (0, 0));
+        assert_eq!(g.width, 3);
+        assert_eq!(g.chars[0][0], '日');
+        assert_eq!(g.chars[0][1], CONT);
+        assert_eq!(g.chars[0][2], 'x');
+
+        let out = paint(&banner, &base_opts(ColorMode::None));
+        let first = out.lines().next().unwrap();
+        assert_eq!(display_width(first), 3);
+        assert!(first.contains('日') && first.contains('x'));
+        assert!(!first.contains(CONT));
+    }
+
+    #[test]
     fn layout_pads_to_common_width() {
         let b = Banner::layout(&font(), "Hi").unwrap();
         assert!(b.height() > 1);
-        assert!(b.lines.iter().all(|l| l.chars().count() == b.width));
+        assert!(b.lines.iter().all(|l| display_width(l) == b.width));
     }
 
     #[test]

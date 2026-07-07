@@ -91,8 +91,15 @@ fn frame(grid: &Grid, opts: &RenderOptions, phase: f32, reveal: Option<usize>) -
         let mut last = None;
         for col in 0..grid.width {
             let hidden = reveal.is_some_and(|r| col >= r);
+            if hidden {
+                out.push(' '); // blank column, preserves width
+                continue;
+            }
             let ch = grid.chars[row][col];
-            if ch == ' ' || hidden {
+            if ch == crate::render::CONT {
+                continue; // second column of a wide glyph; already drawn
+            }
+            if ch == ' ' {
                 out.push(' ');
                 continue;
             }
