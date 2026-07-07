@@ -71,22 +71,105 @@ pub fn available() -> String {
         .join(", ")
 }
 
-/// Load a font by canonical name or alias (case-insensitive).
+/// Load a font by bundled name/alias, a path to a `.flf` file, or a name in
+/// the user fonts directory (`$XDG_CONFIG_HOME/sigil/fonts` or
+/// `~/.config/sigil/fonts`).
 pub fn load(name: &str) -> Result<FIGfont, String> {
     let q = name.to_ascii_lowercase();
-    let entry = TABLE
+    if let Some(b) = TABLE
         .iter()
-        .find(|b| b.canonical == q || b.aliases.contains(&q.as_str()));
-    match entry {
-        Some(b) => match b.flf {
+        .find(|b| b.canonical == q || b.aliases.contains(&q.as_str()))
+    {
+        return match b.flf {
             None => FIGfont::standard(),
-            Some(content) => FIGfont::from_content(content),
-        },
-        None => Err(format!(
-            "unknown font: {name}. Available: {}. (custom .flf files are on the roadmap)",
-            available()
-        )),
+            Some(content) => parse_flf(content),
+        };
     }
+
+    // An explicit path to a .flf file.
+    let path = std::path::Path::new(name);
+    if name.ends_with(".flf") || path.is_file() {
+        let content =
+            std::fs::read_to_string(path).map_err(|e| format!("cannot read font {name}: {e}"))?;
+        return parse_flf(&content);
+    }
+
+    // A named font in the user fonts directory.
+    if let Some(dir) = user_fonts_dir() {
+        let p = dir.join(format!("{name}.flf"));
+        if p.is_file() {
+            let content = std::fs::read_to_string(&p)
+                .map_err(|e| format!("cannot read font {}: {e}", p.display()))?;
+            return parse_flf(&content);
+        }
+    }
+
+    Err(format!(
+        "unknown font: {name}. Available: {} (or pass a path to a .flf file)",
+        available()
+    ))
+}
+
+/// Parse `.flf` content, first trimming it to the 102 required characters so
+/// that fonts carrying code-tagged extra glyphs still parse.
+fn parse_flf(content: &str) -> Result<FIGfont, String> {
+    FIGfont::from_content(&trim_to_required(content))
+        .map_err(|e| format!("invalid figlet font: {e}"))
+}
+
+/// Keep only the header, comment lines, and the 102 required characters
+/// (95 printable ASCII + 7 German), dropping any code-tagged glyphs that some
+/// `.flf` files append and that the parser can choke on.
+fn trim_to_required(content: &str) -> String {
+    const REQUIRED: usize = 102;
+    let lines: Vec<&str> = content.lines().collect();
+    let header: Vec<&str> = match lines.first() {
+        Some(h) => h.split_whitespace().collect(),
+        None => return content.to_string(),
+    };
+    let height = header.get(1).and_then(|s| s.parse::<usize>().ok());
+    let comments = header.get(5).and_then(|s| s.parse::<usize>().ok());
+    match (height, comments) {
+        (Some(h), Some(c)) => {
+            let keep = (1 + c + REQUIRED * h).min(lines.len());
+            let mut out = lines[..keep].join("\n");
+            out.push('\n');
+            out
+        }
+        // Malformed header: let the parser report the real error.
+        _ => content.to_string(),
+    }
+}
+
+/// The user fonts directory, if a home/config location can be determined.
+fn user_fonts_dir() -> Option<std::path::PathBuf> {
+    let base = std::env::var_os("XDG_CONFIG_HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config"))
+        })?;
+    Some(base.join("sigil").join("fonts"))
+}
+
+/// Names (file stems) of any `.flf` fonts in the user fonts directory, sorted.
+pub fn user_font_names() -> Vec<String> {
+    let Some(dir) = user_fonts_dir() else {
+        return Vec::new();
+    };
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return Vec::new();
+    };
+    let mut names: Vec<String> = entries
+        .flatten()
+        .filter(|e| e.path().extension().is_some_and(|x| x == "flf"))
+        .filter_map(|e| {
+            e.path()
+                .file_stem()
+                .map(|s| s.to_string_lossy().into_owned())
+        })
+        .collect();
+    names.sort();
+    names
 }
 
 #[cfg(test)]
@@ -110,5 +193,25 @@ mod tests {
         assert!(load("ANSI-Shadow").is_ok());
         assert!(load("default").is_ok());
         assert!(load("nope").is_err());
+    }
+
+    #[test]
+    fn trim_drops_codetag_glyphs() {
+        // height=1, comments=0 => keep header + 102 required lines.
+        let mut content = String::from("flf2a$ 1 1 5 0 0\n");
+        for i in 0..102 {
+            content.push_str(&format!("row{i}@@\n"));
+        }
+        // Extra code-tagged glyphs that must be dropped.
+        content.push_str("160  NO-BREAK SPACE\n $@@\n");
+        let trimmed = trim_to_required(&content);
+        assert_eq!(trimmed.lines().count(), 1 + 102);
+        assert!(!trimmed.contains("NO-BREAK SPACE"));
+    }
+
+    #[test]
+    fn missing_font_path_errors_clearly() {
+        let err = load("/no/such/font.flf").unwrap_err();
+        assert!(err.contains("cannot read font"));
     }
 }
