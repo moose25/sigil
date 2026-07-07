@@ -307,6 +307,9 @@ pub struct RenderOptions {
     pub border_color: Option<Rgb>,
     /// Solid background fill behind the whole box; `None` leaves it bare.
     pub background: Option<Rgb>,
+    /// Gradient background fill behind the whole box (overrides `background`
+    /// where a cell is covered); `None` leaves the solid/base background.
+    pub background_gradient: Option<Gradient>,
     /// How the gradient is mapped across the banner.
     pub color_by: ColorBy,
     /// Drop-shadow color behind the glyphs; `None` disables the shadow.
@@ -510,6 +513,19 @@ pub fn cell_color(grid: &Grid, opts: &RenderOptions, row: usize, col: usize, pha
     opts.gradient.sample(t)
 }
 
+/// Background color for a cell when `background_gradient` is set — sampled along
+/// the sweep direction across the whole box, honoring reverse/cycle. Returns
+/// `None` when there is no background gradient (callers fall back to the solid
+/// background or leave the cell bare).
+pub fn bg_cell_color(grid: &Grid, opts: &RenderOptions, row: usize, col: usize) -> Option<Rgb> {
+    let g = opts.background_gradient.as_ref()?;
+    let base = opts
+        .direction
+        .t(row, col, grid.height.max(1), grid.width.max(1));
+    let t = crate::gradient::adjust_t(base, opts.reverse, opts.cycle);
+    Some(g.sample(t))
+}
+
 /// Paint `banner` into a printable string with ANSI color escapes.
 pub fn paint(banner: &Banner, opts: &RenderOptions) -> String {
     let grid = compose(banner, opts);
@@ -526,32 +542,44 @@ pub fn paint(banner: &Banner, opts: &RenderOptions) -> String {
     for _ in 0..opts.margin_y {
         out.push('\n');
     }
-    // Background is applied per row (indent stays outside the fill) and cleared
-    // by the reset at each line's end.
-    let bg = opts
+    // Background: a solid fill is set once per row; a gradient fill is set
+    // per cell as it changes. Both are cleared by the reset at each line's end.
+    let color_on = opts.mode != ColorMode::None;
+    let has_bg_grad = color_on && opts.background_gradient.is_some();
+    let solid_bg = opts
         .background
-        .filter(|_| opts.mode != ColorMode::None)
+        .filter(|_| color_on && !has_bg_grad)
         .map(|c| opts.mode.bg(c));
 
     for row in 0..grid.height {
         out.push_str(&pad);
-        if let Some(bg) = &bg {
+        if let Some(bg) = &solid_bg {
             out.push_str(bg);
         }
-        let mut last: Option<Rgb> = None;
+        let mut last_fg: Option<Rgb> = None;
+        let mut last_bg: Option<Rgb> = None;
         for col in 0..grid.width {
             let ch = grid.chars[row][col];
             if ch == CONT {
                 continue; // second column of a wide glyph; already drawn
+            }
+            if has_bg_grad {
+                let bgc = bg_cell_color(&grid, opts, row, col);
+                if last_bg != bgc {
+                    if let Some(c) = bgc {
+                        out.push_str(&opts.mode.bg(c));
+                    }
+                    last_bg = bgc;
+                }
             }
             if ch == ' ' {
                 out.push(' ');
                 continue;
             }
             let color = cell_color(&grid, opts, row, col, 0.0);
-            if opts.mode != ColorMode::None && last != Some(color) {
+            if color_on && last_fg != Some(color) {
                 out.push_str(&opts.mode.fg(color));
-                last = Some(color);
+                last_fg = Some(color);
             }
             out.push(ch);
         }
@@ -603,6 +631,23 @@ fn svg_impl(
         "<rect width=\"100%\" height=\"100%\" rx=\"8\" fill=\"{}\"/>\n",
         hex(bg)
     ));
+    // A gradient background is drawn as a grid of per-cell rects over the base.
+    if opts.background_gradient.is_some() {
+        for row in 0..grid.height {
+            for col in 0..grid.width {
+                if let Some(c) = bg_cell_color(&grid, opts, row, col) {
+                    s.push_str(&format!(
+                        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.2}\" height=\"{:.2}\" fill=\"{}\"/>\n",
+                        col as f32 * cell_w,
+                        row as f32 * line_h,
+                        cell_w + 0.5,
+                        line_h + 0.5,
+                        hex(c)
+                    ));
+                }
+            }
+        }
+    }
     s.push_str(&format!(
         "<text xml:space=\"preserve\" font-family=\"ui-monospace,SFMono-Regular,Menlo,Consolas,monospace\" \
          font-size=\"{font_size:.0}\" font-weight=\"bold\">\n"
@@ -722,6 +767,16 @@ pub fn to_png(
             }
         }
     };
+    // Gradient background: paint each cell's backdrop before the glyphs.
+    if opts.background_gradient.is_some() {
+        for row in 0..grid.height {
+            for col in 0..grid.width {
+                if let Some(c) = bg_cell_color(&grid, opts, row, col) {
+                    fill(col * cw, row * ch, c);
+                }
+            }
+        }
+    }
     for row in 0..grid.height {
         for col in 0..grid.width {
             if grid.chars[row][col] == ' ' {
@@ -782,22 +837,34 @@ pub fn to_apng(
             for _ in 0..(w * h) {
                 px.extend_from_slice(&[bg.r, bg.g, bg.b]);
             }
+            let mut put = |x0: usize, y0: usize, c: Rgb| {
+                for y in y0..y0 + ch {
+                    let base = (y * w + x0) * 3;
+                    for x in 0..cw {
+                        let i = base + x * 3;
+                        px[i] = c.r;
+                        px[i + 1] = c.g;
+                        px[i + 2] = c.b;
+                    }
+                }
+            };
+            // Static gradient backdrop behind the shimmering glyphs.
+            if opts.background_gradient.is_some() {
+                for row in 0..grid.height {
+                    for col in 0..grid.width {
+                        if let Some(c) = bg_cell_color(&grid, opts, row, col) {
+                            put(col * cw, row * ch, c);
+                        }
+                    }
+                }
+            }
             for row in 0..grid.height {
                 for col in 0..grid.width {
                     if grid.chars[row][col] == ' ' {
                         continue;
                     }
                     let c = cell_color(&grid, opts, row, col, phase);
-                    let (x0, y0) = (col * cw, row * ch);
-                    for y in y0..y0 + ch {
-                        let base = (y * w + x0) * 3;
-                        for x in 0..cw {
-                            let i = base + x * 3;
-                            px[i] = c.r;
-                            px[i + 1] = c.g;
-                            px[i + 2] = c.b;
-                        }
-                    }
+                    put(col * cw, row * ch, c);
                 }
             }
             writer
@@ -851,7 +918,33 @@ pub fn to_html(banner: &Banner, opts: &RenderOptions, background: Option<Rgb>) -
          display:inline-block;color:#fff\">",
         hex(bg)
     ));
+    let has_bg_grad = opts.background_gradient.is_some();
     for row in 0..grid.height {
+        if has_bg_grad {
+            // Per-cell spans so each cell can carry its own background color.
+            for col in 0..grid.width {
+                let ch = grid.chars[row][col];
+                if ch == CONT {
+                    continue;
+                }
+                let mut style = String::new();
+                if let Some(b) = bg_cell_color(&grid, opts, row, col) {
+                    style.push_str(&format!("background:{};", hex(b)));
+                }
+                if ch != ' ' {
+                    style.push_str(&format!(
+                        "color:{};",
+                        hex(cell_color(&grid, opts, row, col, 0.0))
+                    ));
+                }
+                s.push_str(&format!(
+                    "<span style=\"{style}\">{}</span>",
+                    xml_escape(&ch.to_string())
+                ));
+            }
+            s.push('\n');
+            continue;
+        }
         let mut run = String::new();
         let mut fill: Option<Rgb> = None;
         for col in 0..grid.width {
@@ -943,6 +1036,7 @@ mod tests {
             padding: (0, 0),
             border_color: None,
             background: None,
+            background_gradient: None,
             color_by: ColorBy::Banner,
             shadow: None,
             outline: None,
@@ -984,6 +1078,21 @@ mod tests {
         let mid = &iced.lines[iced.lines.len() / 2];
         assert!(mid.starts_with('*'));
         assert!(iced.lines.iter().all(|l| display_width(l) == iced.width));
+    }
+
+    #[test]
+    fn background_gradient_adds_svg_cells() {
+        let b = Banner::layout(&font(), "Hi").unwrap();
+        let plain = to_svg(&b, &base_opts(ColorMode::True), None);
+        let mut opts = base_opts(ColorMode::True);
+        opts.background_gradient = Some(Gradient::preset("dusk").unwrap());
+        let washed = to_svg(&b, &opts, None);
+        // The bg gradient adds a per-cell rect grid, so there are more rects.
+        assert!(washed.matches("<rect").count() > plain.matches("<rect").count());
+        // And bg_cell_color yields a color where a gradient is set (none otherwise).
+        let grid = compose(&b, &opts);
+        assert!(bg_cell_color(&grid, &opts, 0, 0).is_some());
+        assert!(bg_cell_color(&grid, &base_opts(ColorMode::True), 0, 0).is_none());
     }
 
     #[test]

@@ -74,6 +74,11 @@ struct Cli {
     #[arg(long, visible_alias = "bg", value_name = "HEX")]
     background: Option<String>,
 
+    /// Gradient background behind the banner: a preset name or comma-separated
+    /// hex stops (e.g. --bg-gradient dusk).
+    #[arg(long, value_name = "SPEC")]
+    bg_gradient: Option<String>,
+
     /// Caption to embed in the top border (needs a border).
     #[arg(long, value_name = "TEXT")]
     title: Option<String>,
@@ -332,6 +337,7 @@ struct Settings {
     pad_y: Option<usize>,
     border_color: Option<String>,
     background: Option<String>,
+    bg_gradient: Option<String>,
     margin: usize,
     margin_x: usize,
     min_width: Option<usize>,
@@ -424,6 +430,7 @@ impl Settings {
                 .clone()
                 .or(theme.background)
                 .or(cfg.background),
+            bg_gradient: cli.bg_gradient.clone().or(cfg.bg_gradient),
             margin: cli.margin.or(cfg.margin).unwrap_or(0),
             margin_x: cli.margin_x.or(cfg.margin_x).unwrap_or(0),
             min_width: cli.min_width.or(cfg.min_width),
@@ -600,6 +607,10 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
     } else {
         None
     };
+    let background_gradient = match &s.bg_gradient {
+        Some(spec) => Some(gradient_from_spec(spec)?.with_interp(Interp::parse(&s.interpolate)?)),
+        None => None,
+    };
 
     // Framed width includes the border and padding.
     let framed_w = banner.width + 2 * padding.0 + if border.is_some() { 2 } else { 0 };
@@ -625,6 +636,7 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         padding,
         border_color,
         background,
+        background_gradient,
         color_by,
         shadow,
         outline,
@@ -826,6 +838,18 @@ fn load_palette(path: &Path) -> Result<Vec<Rgb>, String> {
     Ok(colors)
 }
 
+/// Resolve a gradient spec that is either a preset name or a comma-separated
+/// list of hex stops (as accepted by `--colors`).
+fn gradient_from_spec(spec: &str) -> Result<Gradient, String> {
+    let spec = spec.trim();
+    if spec.contains(',') || spec.starts_with('#') {
+        parse_stops(&spec.split(',').map(str::to_string).collect::<Vec<_>>())
+    } else {
+        Gradient::preset(spec)
+            .ok_or_else(|| format!("unknown gradient: {spec}. See `sigil gradients`."))
+    }
+}
+
 /// Parse a list of hex color stops into a gradient.
 ///
 /// Each stop is a hex color with an optional `@position` in `[0, 1]`
@@ -965,6 +989,7 @@ fn preview_font(
         padding: (0, 0),
         border_color: None,
         background: None,
+        background_gradient: None,
         color_by: ColorBy::Banner,
         shadow: None,
         outline: None,
@@ -1076,6 +1101,7 @@ fn random_banner(mode: ColorMode, text_args: &[String], seed: Option<u64>) -> Re
         padding: if b.is_some() { (2, 1) } else { (0, 0) },
         border_color: None,
         background: None,
+        background_gradient: None,
         color_by: ColorBy::Banner,
         shadow: shadow.then(|| Rgb::new(28, 28, 34)),
         outline: None,
@@ -1136,6 +1162,7 @@ fn demo(mode: ColorMode) -> Result<(), String> {
             padding: if bordered { (2, 1) } else { (0, 0) },
             border_color: None,
             background: None,
+            background_gradient: None,
             color_by: ColorBy::Banner,
             shadow: shadow.then(|| Rgb::new(28, 28, 34)),
             outline: outline.then(|| Rgb::new(10, 10, 12)),
@@ -1207,6 +1234,7 @@ fn preview_theme(name: &str, t: &Theme, mode: ColorMode) -> Result<(), String> {
         padding: if border.is_some() { (2, 1) } else { (0, 0) },
         border_color: None,
         background,
+        background_gradient: None,
         color_by: ColorBy::Banner,
         shadow: t.shadow.unwrap_or(false).then(|| Rgb::new(28, 28, 34)),
         outline: t.outline.unwrap_or(false).then(|| Rgb::new(10, 10, 12)),

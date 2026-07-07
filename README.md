@@ -109,6 +109,7 @@ sigil "Docs" -F markdown                       # a fenced code block for READMEs
 | `--title <text>` | Caption embedded in the top border | — |
 | `--border-color <hex>` | Solid frame color (default: share the gradient) | — |
 | `--background <hex>` | Solid background fill behind the banner (alias `--bg`) | — |
+| `--bg-gradient <spec>` | Gradient background (preset name or `hex,hex,…`) | — |
 | `--shadow` | Draw a drop shadow behind the glyphs | — |
 | `--shadow-color <hex>` | Shadow color | dark gray |
 | `--outline` | Draw an outline (halo) around the glyphs | — |
