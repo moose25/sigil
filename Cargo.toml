@@ -1,6 +1,6 @@
 [package]
 name = "sigil"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.74"
 description = "Brand your project in seconds — gradient ASCII banners you can drop into your CLI, README, or source code."
