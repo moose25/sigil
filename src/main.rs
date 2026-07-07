@@ -126,6 +126,11 @@ struct Cli {
     #[arg(long, value_name = "NAME")]
     subtitle_font: Option<String>,
 
+    /// Auto-pick the boldest bundled font whose banner fits in N columns
+    /// (overrides --font).
+    #[arg(long, value_name = "COLS")]
+    fit: Option<usize>,
+
     /// Apply a named theme bundle (see `sigil themes`).
     #[arg(short = 't', long)]
     theme: Option<String>,
@@ -305,6 +310,7 @@ struct Settings {
     letter_spacing: Option<usize>,
     subtitle: Option<String>,
     subtitle_font: String,
+    fit: Option<usize>,
     color_by: String,
     interpolate: String,
     title: Option<String>,
@@ -401,6 +407,7 @@ impl Settings {
                 .clone()
                 .or(cfg.subtitle_font)
                 .unwrap_or_else(|| "small".to_string()),
+            fit: cli.fit.or(cfg.fit),
             title: cli.title.clone().or(cfg.title),
             shadow: cli.shadow || theme.shadow.unwrap_or(false) || cfg.shadow.unwrap_or(false),
             shadow_color: cli
@@ -455,7 +462,12 @@ fn resolve_text(args: &[String], lines: bool) -> Result<String, String> {
 
 fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
     let format = Format::parse(&s.format)?;
-    let font = fonts::load(&s.font)?;
+    // --fit picks the boldest bundled font whose render fits in N columns,
+    // overriding --font; otherwise use the resolved font.
+    let font = match s.fit {
+        Some(cols) if s.art.is_none() => fonts::load(&fit_font(text, cols)?)?,
+        _ => fonts::load(&s.font)?,
+    };
     let gradient = resolve_gradient(s)?.with_interp(Interp::parse(&s.interpolate)?);
     let direction = match s.angle {
         Some(deg) => Direction::Angle(deg),
@@ -989,6 +1001,31 @@ fn choose(items: &[&str], rng: &mut SplitMix) -> String {
 /// Bundled font names, for random selection.
 fn font_names() -> Vec<&'static str> {
     fonts::catalog().map(|f| f.name).collect()
+}
+
+/// Pick the boldest bundled font whose rendered banner fits within `cols`
+/// columns for `text`. "Boldest" = tallest, then widest, among those that fit;
+/// if nothing fits (even the narrowest overflows), fall back to the narrowest.
+fn fit_font(text: &str, cols: usize) -> Result<String, String> {
+    let mut best: Option<(usize, usize, String)> = None; // (height, width, name), fits
+    let mut narrowest: Option<(usize, String)> = None; // (width, name), fallback
+    for info in fonts::catalog() {
+        let f = fonts::load(info.name)?;
+        let b = Banner::layout(&f, text)?;
+        if narrowest.as_ref().map_or(true, |(w, _)| b.width < *w) {
+            narrowest = Some((b.width, info.name.to_string()));
+        }
+        if b.width <= cols {
+            let key = (b.height(), b.width);
+            if best.as_ref().map_or(true, |(h, w, _)| key > (*h, *w)) {
+                best = Some((b.height(), b.width, info.name.to_string()));
+            }
+        }
+    }
+    Ok(best
+        .map(|(_, _, n)| n)
+        .or(narrowest.map(|(_, n)| n))
+        .unwrap_or_else(|| "standard".to_string()))
 }
 
 /// Seed for `--random`: the explicit `--seed`, or the current time.

@@ -88,3 +88,21 @@ fn version_flag_works() {
     assert!(out.status.success());
     assert!(String::from_utf8(out.stdout).unwrap().contains("sigil"));
 }
+
+#[test]
+fn fit_respects_the_column_budget() {
+    let out = run(&["hi", "--fit", "30", "-F", "raw"]);
+    assert!(out.status.success());
+    let s = String::from_utf8(out.stdout).unwrap();
+    let widest = s.lines().map(|l| l.chars().count()).max().unwrap_or(0);
+    assert!(widest <= 30, "fit picked a font wider than 30: {widest}");
+}
+
+#[test]
+fn subtitle_stacks_under_the_banner() {
+    let plain = run(&["Acme", "-F", "raw"]);
+    let withsub = run(&["Acme", "--subtitle", "tag", "-F", "raw"]);
+    let n1 = String::from_utf8(plain.stdout).unwrap().lines().count();
+    let n2 = String::from_utf8(withsub.stdout).unwrap().lines().count();
+    assert!(n2 > n1, "subtitle should add rows ({n1} -> {n2})");
+}

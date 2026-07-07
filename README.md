@@ -112,6 +112,7 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 | `--letter-spacing <n>` | Extra blank columns between glyphs (airier look) | — |
 | `--subtitle <text>` | A smaller tagline stacked beneath the banner | — |
 | `--subtitle-font <name>` | Font for the subtitle line | `small` |
+| `--fit <cols>` | Auto-pick the boldest bundled font whose banner fits N columns (overrides `--font`) | — |
 | `-w, --width <cols>` | Target width for alignment | terminal width |
 | `--min-width <cols>` | Pad the banner box out to at least N columns (centered) | — |
 | `-m, --margin <n>` | Blank lines above/below | `0` |
