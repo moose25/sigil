@@ -242,10 +242,7 @@ fn run(cli: Cli) -> Result<(), String> {
     match cli.command {
         Some(Command::Gradients) => list_gradients(base_mode(cli.no_color), &Config::load()?),
         Some(Command::Fonts) => list_fonts(base_mode(cli.no_color)),
-        Some(Command::Themes) => {
-            list_themes(&Config::load()?);
-            Ok(())
-        }
+        Some(Command::Themes) => list_themes(base_mode(cli.no_color), &Config::load()?),
         Some(Command::Demo) => demo(base_mode(cli.no_color)),
         Some(Command::Init { force, print }) => init_config(force, print),
         Some(Command::Completions { shell }) => {
@@ -986,23 +983,26 @@ fn demo(mode: ColorMode) -> Result<(), String> {
     Ok(())
 }
 
-fn list_themes(cfg: &Config) {
-    println!("Built-in themes:\n");
+fn list_themes(mode: ColorMode, cfg: &Config) -> Result<(), String> {
+    println!("Built-in themes:");
     for name in themes::builtin_names() {
-        print_theme(name, &themes::builtin(name).unwrap());
+        preview_theme(name, &themes::builtin(name).unwrap(), mode)?;
     }
     if !cfg.themes.is_empty() {
-        println!("\nYour themes (from config):\n");
+        println!("\n{}", bold("Your themes (from config):", mode));
         let mut names: Vec<&String> = cfg.themes.keys().collect();
         names.sort();
         for name in names {
-            print_theme(name, &cfg.themes[name]);
+            preview_theme(name, &cfg.themes[name], mode)?;
         }
     }
     println!("\nUse: sigil \"Text\" --theme <name>  (flags still override)");
+    Ok(())
 }
 
-fn print_theme(name: &str, t: &Theme) {
+/// Print a theme's summary line and, when color is on, a mini `Sigil` banner
+/// rendered in that theme so its look is visible at a glance.
+fn preview_theme(name: &str, t: &Theme, mode: ColorMode) -> Result<(), String> {
     let parts = [
         t.font.as_deref().map(|v| format!("font={v}")),
         t.gradient.as_deref().map(|v| format!("gradient={v}")),
@@ -1010,7 +1010,43 @@ fn print_theme(name: &str, t: &Theme) {
         t.background.as_deref().map(|v| format!("bg={v}")),
     ];
     let desc: Vec<String> = parts.into_iter().flatten().collect();
-    println!("  {name:<11}  {}", desc.join("  "));
+    println!("\n{}  {}", bold(name, mode), desc.join("  "));
+    if mode == ColorMode::None {
+        return Ok(());
+    }
+    let font = fonts::load(t.font.as_deref().unwrap_or("standard"))?;
+    let banner = Banner::layout(&font, "Sigil")?;
+    let gradient = match &t.colors {
+        Some(c) => parse_stops(&c.split(',').map(str::to_string).collect::<Vec<_>>())?,
+        None => Gradient::preset(t.gradient.as_deref().unwrap_or("ocean"))
+            .ok_or_else(|| format!("theme {name}: unknown gradient"))?,
+    };
+    let border = Border::parse(t.border.as_deref().unwrap_or("none"))?;
+    let background = match &t.background {
+        Some(h) => Some(Rgb::parse(h)?),
+        None => None,
+    };
+    let opts = RenderOptions {
+        gradient,
+        direction: Direction::Horizontal,
+        align: Align::Left,
+        mode,
+        target_width: 0,
+        margin_y: 0,
+        margin_x: 0,
+        reverse: false,
+        cycle: 1,
+        border,
+        padding: if border.is_some() { (2, 1) } else { (0, 0) },
+        border_color: None,
+        background,
+        color_by: ColorBy::Banner,
+        shadow: t.shadow.unwrap_or(false).then(|| Rgb::new(28, 28, 34)),
+        outline: t.outline.unwrap_or(false).then(|| Rgb::new(10, 10, 12)),
+        title: None,
+    };
+    print!("{}", paint(&banner, &opts));
+    Ok(())
 }
 
 /// A tiny SplitMix64 PRNG — enough for picking a random font/gradient without
