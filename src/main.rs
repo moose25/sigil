@@ -125,8 +125,10 @@ fn run(cli: Cli) -> Result<(), String> {
     }
 }
 
+/// Color mode for the list/preview subcommands: like the main render, color
+/// only when writing to a real terminal (and not disabled).
 fn base_mode(no_color: bool) -> ColorMode {
-    if no_color {
+    if no_color || !std::io::stdout().is_terminal() {
         ColorMode::None
     } else {
         ColorMode::detect()
@@ -369,12 +371,21 @@ fn list_fonts(mode: ColorMode) -> Result<(), String> {
     }
     let user = fonts::user_font_names();
     if !user.is_empty() {
-        println!("\n\x1b[1mUser fonts\x1b[0m (~/.config/sigil/fonts):");
+        println!("\n{}", bold("User fonts (~/.config/sigil/fonts):", mode));
         for name in user {
             preview_font(&name, "custom", &gradient, mode)?;
         }
     }
     Ok(())
+}
+
+/// Wrap text in bold, unless color is disabled.
+fn bold(text: &str, mode: ColorMode) -> String {
+    if mode == ColorMode::None {
+        text.to_string()
+    } else {
+        format!("\x1b[1m{text}\x1b[0m")
+    }
 }
 
 fn preview_font(
@@ -383,7 +394,7 @@ fn preview_font(
     gradient: &Gradient,
     mode: ColorMode,
 ) -> Result<(), String> {
-    println!("\n\x1b[1m{name}\x1b[0m — {description}");
+    println!("\n{} — {description}", bold(name, mode));
     let font = fonts::load(name)?;
     let banner = Banner::layout(&font, "Sigil")?;
     let opts = RenderOptions {
