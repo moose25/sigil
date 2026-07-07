@@ -91,6 +91,7 @@ sigil "Docs" -F markdown                       # a fenced code block for READMEs
 | ---- | ----------- | ------- |
 | `-g, --gradient <name>` | Named preset (see `sigil gradients`) | `ocean` |
 | `-c, --colors <hex,...>` | Custom gradient stops (optional `@pos`, e.g. `#000@0,#fff@0.8`) | — |
+| `--gradient-file <file>` | Load stops from a palette file (hex-per-line or GIMP `.gpl`) | — |
 | `-d, --direction <dir>` | `horizontal` \| `vertical` \| `diagonal` \| `radial` \| `conic` | `horizontal` |
 | `--angle <deg>` | Sweep angle in degrees (overrides `--direction`) | — |
 | `--color-by <mode>` | `banner` \| `line` \| `char` (per-line / per-glyph coloring) | `banner` |

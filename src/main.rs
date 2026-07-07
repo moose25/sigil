@@ -29,6 +29,11 @@ struct Cli {
     #[arg(short = 'c', long)]
     colors: Option<String>,
 
+    /// Load gradient stops from a palette file (one hex or "R G B" per line;
+    /// GIMP .gpl supported). Overridden by --colors.
+    #[arg(long, value_name = "FILE")]
+    gradient_file: Option<std::path::PathBuf>,
+
     /// Sweep direction: horizontal | vertical | diagonal. [default: horizontal]
     #[arg(short, long)]
     direction: Option<String>,
@@ -289,6 +294,7 @@ fn base_mode(no_color: bool) -> ColorMode {
 struct Settings {
     gradient: String,
     colors: Option<String>,
+    gradient_file: Option<std::path::PathBuf>,
     font: String,
     direction: String,
     align: String,
@@ -366,6 +372,7 @@ impl Settings {
                 .or(cfg.gradient)
                 .unwrap_or_else(|| "ocean".to_string()),
             colors: cli.colors.clone().or(theme.colors).or(cfg.colors),
+            gradient_file: cli.gradient_file.clone().or(cfg.gradient_file),
             font: cli
                 .font
                 .clone()
@@ -742,11 +749,51 @@ fn resolve_gradient(s: &Settings) -> Result<Gradient, String> {
         return parse_stops(&list.split(',').map(str::to_string).collect::<Vec<_>>())
             .map_err(|e| format!("--colors: {e}"));
     }
+    if let Some(path) = &s.gradient_file {
+        let colors = load_palette(path)?;
+        return Ok(Gradient::new(&colors));
+    }
     if let Some(stops) = s.user_gradients.get(&s.gradient) {
         return parse_stops(stops).map_err(|e| format!("gradient {:?}: {e}", s.gradient));
     }
     Gradient::preset(&s.gradient)
         .ok_or_else(|| format!("unknown gradient: {}. See `sigil gradients`.", s.gradient))
+}
+
+/// Load gradient stops from a palette file.
+///
+/// Accepts one color per line as `#rrggbb`/`rrggbb`/`#rgb` or a decimal
+/// `R G B` triple (so GIMP `.gpl` palettes and plain hex lists both work).
+/// Blank lines and anything that isn't a color (headers, comments) are skipped.
+fn load_palette(path: &Path) -> Result<Vec<Rgb>, String> {
+    let text = std::fs::read_to_string(path)
+        .map_err(|e| format!("cannot read palette {}: {e}", path.display()))?;
+    let mut colors = Vec::new();
+    for line in text.lines() {
+        let tokens: Vec<&str> = line.split_whitespace().collect();
+        if tokens.is_empty() {
+            continue;
+        }
+        // Decimal "R G B [name]" (e.g. GIMP .gpl entries).
+        if tokens.len() >= 3 {
+            if let (Ok(r), Ok(g), Ok(b)) = (
+                tokens[0].parse::<u8>(),
+                tokens[1].parse::<u8>(),
+                tokens[2].parse::<u8>(),
+            ) {
+                colors.push(Rgb::new(r, g, b));
+                continue;
+            }
+        }
+        // Otherwise a hex token; unparseable lines (headers/comments) are skipped.
+        if let Ok(c) = Rgb::parse(tokens[0]) {
+            colors.push(c);
+        }
+    }
+    if colors.is_empty() {
+        return Err(format!("no colors found in palette {}", path.display()));
+    }
+    Ok(colors)
 }
 
 /// Parse a list of hex color stops into a gradient.

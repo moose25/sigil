@@ -18,6 +18,7 @@ use serde::Deserialize;
 pub struct Config {
     pub gradient: Option<String>,
     pub colors: Option<String>,
+    pub gradient_file: Option<PathBuf>,
     pub font: Option<String>,
     pub direction: Option<String>,
     pub align: Option<String>,
@@ -91,6 +92,7 @@ impl Config {
         overlay!(
             gradient,
             colors,
+            gradient_file,
             font,
             direction,
             align,

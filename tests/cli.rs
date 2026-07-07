@@ -99,6 +99,16 @@ fn fit_respects_the_column_budget() {
 }
 
 #[test]
+fn gradient_file_loads_a_palette() {
+    let path = std::env::temp_dir().join("sigil_it_palette.gpl");
+    std::fs::write(&path, "GIMP Palette\n# c\n255 95 109 Coral\n#ffc371\n").unwrap();
+    let out = run(&["hi", "--gradient-file", path.to_str().unwrap(), "-F", "raw"]);
+    let _ = std::fs::remove_file(&path);
+    assert!(out.status.success());
+    assert!(!String::from_utf8(out.stdout).unwrap().trim().is_empty());
+}
+
+#[test]
 fn subtitle_stacks_under_the_banner() {
     let plain = run(&["Acme", "-F", "raw"]);
     let withsub = run(&["Acme", "--subtitle", "tag", "-F", "raw"]);
