@@ -310,6 +310,9 @@ pub struct RenderOptions {
     /// Gradient background fill behind the whole box (overrides `background`
     /// where a cell is covered); `None` leaves the solid/base background.
     pub background_gradient: Option<Gradient>,
+    /// Replace glyph characters with block-shade glyphs (░▒▓█) chosen by the
+    /// gradient's brightness, so the gradient reads even without color.
+    pub shade: bool,
     /// How the gradient is mapped across the banner.
     pub color_by: ColorBy,
     /// Drop-shadow color behind the glyphs; `None` disables the shadow.
@@ -513,6 +516,32 @@ pub fn cell_color(grid: &Grid, opts: &RenderOptions, row: usize, col: usize, pha
     opts.gradient.sample(t)
 }
 
+/// Pick a block-shade glyph for a color by its brightness — `░` for dim up to
+/// `█` for bright — so a gradient reads as varying density even without color.
+pub fn shade_glyph(c: Rgb) -> char {
+    const BLOCKS: [char; 4] = ['░', '▒', '▓', '█'];
+    let lum = (0.299 * c.r as f32 + 0.587 * c.g as f32 + 0.114 * c.b as f32) / 255.0;
+    let i = ((lum * BLOCKS.len() as f32) as usize).min(BLOCKS.len() - 1);
+    BLOCKS[i]
+}
+
+/// The glyph to draw for a cell: in shade mode, a block-shade char for glyph
+/// cells (frame/space cells are unchanged); otherwise the original character.
+fn shaded(
+    ch: char,
+    grid: &Grid,
+    opts: &RenderOptions,
+    row: usize,
+    col: usize,
+    fill: Option<Rgb>,
+) -> char {
+    if opts.shade && ch != ' ' && !grid.is_frame[row][col] {
+        shade_glyph(fill.unwrap_or_else(|| cell_color(grid, opts, row, col, 0.0)))
+    } else {
+        ch
+    }
+}
+
 /// Background color for a cell when `background_gradient` is set — sampled along
 /// the sweep direction across the whole box, honoring reverse/cycle. Returns
 /// `None` when there is no background gradient (callers fall back to the solid
@@ -581,7 +610,13 @@ pub fn paint(banner: &Banner, opts: &RenderOptions) -> String {
                 out.push_str(&opts.mode.fg(color));
                 last_fg = Some(color);
             }
-            out.push(ch);
+            // In shade mode, glyph cells become block-shade chars by brightness
+            // (frame/border chars keep their box-drawing glyphs).
+            if opts.shade && !grid.is_frame[row][col] {
+                out.push(shade_glyph(color));
+            } else {
+                out.push(ch);
+            }
         }
         out.push_str(opts.mode.reset());
         out.push('\n');
@@ -689,7 +724,7 @@ fn svg_impl(
                 if ch != ' ' {
                     fill = cell_fill;
                 }
-                run.push(ch);
+                run.push(shaded(ch, &grid, opts, row, col, cell_fill));
             }
             push_span(&mut s, &run, fill);
         }
@@ -937,9 +972,10 @@ pub fn to_html(banner: &Banner, opts: &RenderOptions, background: Option<Rgb>) -
                         hex(cell_color(&grid, opts, row, col, 0.0))
                     ));
                 }
+                let disp = shaded(ch, &grid, opts, row, col, None);
                 s.push_str(&format!(
                     "<span style=\"{style}\">{}</span>",
-                    xml_escape(&ch.to_string())
+                    xml_escape(&disp.to_string())
                 ));
             }
             s.push('\n');
@@ -964,7 +1000,7 @@ pub fn to_html(banner: &Banner, opts: &RenderOptions, background: Option<Rgb>) -
             if ch != ' ' {
                 fill = cell_fill;
             }
-            run.push(ch);
+            run.push(shaded(ch, &grid, opts, row, col, cell_fill));
         }
         push_html_span(&mut s, &run, fill);
         s.push('\n');
@@ -1037,6 +1073,7 @@ mod tests {
             border_color: None,
             background: None,
             background_gradient: None,
+            shade: false,
             color_by: ColorBy::Banner,
             shadow: None,
             outline: None,
@@ -1078,6 +1115,19 @@ mod tests {
         let mid = &iced.lines[iced.lines.len() / 2];
         assert!(mid.starts_with('*'));
         assert!(iced.lines.iter().all(|l| display_width(l) == iced.width));
+    }
+
+    #[test]
+    fn shade_mode_uses_block_glyphs() {
+        let b = Banner::layout(&font(), "Hi").unwrap();
+        let mut opts = base_opts(ColorMode::None);
+        opts.shade = true;
+        let out = paint(&b, &opts);
+        // Glyph cells become block-shade chars; the original '_'/'|' are gone.
+        assert!(out.chars().any(|c| "░▒▓█".contains(c)));
+        // shade_glyph maps brightness low→high onto ░ … █.
+        assert_eq!(shade_glyph(Rgb::new(0, 0, 0)), '░');
+        assert_eq!(shade_glyph(Rgb::new(255, 255, 255)), '█');
     }
 
     #[test]

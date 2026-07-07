@@ -100,6 +100,7 @@ sigil "Docs" -F markdown                       # a fenced code block for READMEs
 | `-d, --direction <dir>` | `horizontal` \| `vertical` \| `diagonal` \| `radial` \| `conic` | `horizontal` |
 | `--angle <deg>` | Sweep angle in degrees (overrides `--direction`) | — |
 | `--color-by <mode>` | `banner` \| `line` \| `char` (per-line / per-glyph coloring) | `banner` |
+| `--fill <mode>` | `glyph` \| `shade` (block-shade ░▒▓█ by brightness, reads without color) | `glyph` |
 | `--interpolate <space>` | Blend space: `oklab` \| `rgb` \| `hsl` | `oklab` |
 | `--reverse` | Flip the gradient direction | — |
 | `--cycle <n>` | Repeat the palette N times across the banner | `1` |

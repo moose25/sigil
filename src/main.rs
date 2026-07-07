@@ -107,6 +107,11 @@ struct Cli {
     #[arg(long)]
     color_by: Option<String>,
 
+    /// Glyph fill: glyph (normal) | shade (block-shade ░▒▓█ by brightness, so
+    /// the gradient reads without color). [default: glyph]
+    #[arg(long, value_name = "MODE")]
+    fill: Option<String>,
+
     /// Gradient blend space: oklab | rgb | hsl. [default: oklab]
     #[arg(long)]
     interpolate: Option<String>,
@@ -351,6 +356,7 @@ struct Settings {
     copy: bool,
     art: Option<std::path::PathBuf>,
     icon: Option<String>,
+    shade: bool,
     letter_spacing: Option<usize>,
     subtitle: Option<String>,
     subtitle_font: String,
@@ -446,6 +452,11 @@ impl Settings {
             color_by: pick(&cli.color_by, None, cfg.color_by, "banner"),
             interpolate: pick(&cli.interpolate, None, cfg.interpolate, "oklab"),
             icon: cli.icon.clone().or(cfg.icon),
+            shade: match cli.fill.clone().or(cfg.fill).as_deref() {
+                None | Some("glyph") => false,
+                Some("shade") => true,
+                Some(other) => return Err(format!("unknown fill: {other} (glyph|shade)")),
+            },
             letter_spacing: cli.letter_spacing.or(cfg.letter_spacing),
             subtitle: cli.subtitle.clone().or(cfg.subtitle),
             subtitle_font: cli
@@ -637,6 +648,7 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         border_color,
         background,
         background_gradient,
+        shade: s.shade,
         color_by,
         shadow,
         outline,
@@ -990,6 +1002,7 @@ fn preview_font(
         border_color: None,
         background: None,
         background_gradient: None,
+        shade: false,
         color_by: ColorBy::Banner,
         shadow: None,
         outline: None,
@@ -1102,6 +1115,7 @@ fn random_banner(mode: ColorMode, text_args: &[String], seed: Option<u64>) -> Re
         border_color: None,
         background: None,
         background_gradient: None,
+        shade: false,
         color_by: ColorBy::Banner,
         shadow: shadow.then(|| Rgb::new(28, 28, 34)),
         outline: None,
@@ -1163,6 +1177,7 @@ fn demo(mode: ColorMode) -> Result<(), String> {
             border_color: None,
             background: None,
             background_gradient: None,
+            shade: false,
             color_by: ColorBy::Banner,
             shadow: shadow.then(|| Rgb::new(28, 28, 34)),
             outline: outline.then(|| Rgb::new(10, 10, 12)),
@@ -1235,6 +1250,7 @@ fn preview_theme(name: &str, t: &Theme, mode: ColorMode) -> Result<(), String> {
         border_color: None,
         background,
         background_gradient: None,
+        shade: false,
         color_by: ColorBy::Banner,
         shadow: t.shadow.unwrap_or(false).then(|| Rgb::new(28, 28, 34)),
         outline: t.outline.unwrap_or(false).then(|| Rgb::new(10, 10, 12)),
