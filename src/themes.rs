@@ -67,6 +67,19 @@ pub fn builtin(name: &str) -> Option<Theme> {
             shadow: Some(true),
             ..base("ansishadow", "ice", "double", Some("#05060f"))
         },
+        "synthwave" => Theme {
+            shadow: Some(true),
+            ..base("ansishadow", "vaporwave", "heavy", Some("#1a0033"))
+        },
+        "arctic" => Theme {
+            outline: Some(true),
+            outline_color: Some("#062033".to_string()),
+            ..base("small", "glacier", "round", Some("#04141f"))
+        },
+        "sepia" => Theme {
+            colors: Some("#5b3a1a,#a67b5b,#e0c9a6".to_string()),
+            ..base("slant", "gold", "single", Some("#140f0a"))
+        },
         _ => return None,
     })
 }
@@ -85,6 +98,9 @@ pub fn builtin_names() -> &'static [&'static str] {
         "forest",
         "candy",
         "midnight",
+        "synthwave",
+        "arctic",
+        "sepia",
     ]
 }
 
@@ -97,11 +113,21 @@ mod tests {
         for name in builtin_names() {
             let th = builtin(name).unwrap_or_else(|| panic!("missing {name}"));
             assert!(th.font.is_some() && th.gradient.is_some());
+            // Each theme must name a real gradient preset (unless it overrides
+            // with explicit colors), so a typo can't ship a broken theme.
+            if th.colors.is_none() {
+                let g = th.gradient.as_deref().unwrap();
+                assert!(
+                    crate::gradient::Gradient::preset(g).is_some(),
+                    "theme {name} references unknown gradient {g}"
+                );
+            }
         }
         assert!(builtin("nope").is_none());
         // Effect-bearing themes set their effects.
         assert_eq!(builtin("midnight").unwrap().shadow, Some(true));
         assert_eq!(builtin("mono").unwrap().outline, Some(true));
+        assert_eq!(builtin("synthwave").unwrap().shadow, Some(true));
     }
 
     #[test]

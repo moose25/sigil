@@ -261,6 +261,8 @@ mod tests {
             padding: (0, 0),
             border_color: None,
             background: None,
+            background_gradient: None,
+            shade: false,
             color_by: ColorBy::Banner,
             shadow: None,
             outline: None,

@@ -1,9 +1,9 @@
 [package]
 name = "sigil"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.74"
-description = "Give your CLI a face — modern gradient ASCII banners for your projects."
+description = "Brand your project in seconds — gradient ASCII banners you can drop into your CLI, README, or source code."
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/moose25/sigil"
@@ -11,6 +11,16 @@ homepage = "https://github.com/moose25/sigil"
 keywords = ["ascii", "banner", "figlet", "gradient", "cli"]
 categories = ["command-line-utilities", "text-processing"]
 exclude = ["assets/", "demo.tape", ".github/"]
+
+# `cargo binstall sigil` — fetch prebuilt release archives instead of building.
+# Matches the taiki-e/upload-rust-binary-action assets (sigil-<target>.<ext>).
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }{ archive-suffix }"
+pkg-fmt = "tgz"
+bin-dir = "{ bin }{ binary-ext }"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-fmt = "zip"
 
 [[bin]]
 name = "sigil"

@@ -18,10 +18,13 @@ use serde::Deserialize;
 pub struct Config {
     pub gradient: Option<String>,
     pub colors: Option<String>,
+    pub from: Option<String>,
+    pub gradient_file: Option<PathBuf>,
     pub font: Option<String>,
     pub direction: Option<String>,
     pub align: Option<String>,
     pub color_by: Option<String>,
+    pub fill: Option<String>,
     pub interpolate: Option<String>,
     pub angle: Option<f32>,
     pub reverse: Option<bool>,
@@ -32,19 +35,27 @@ pub struct Config {
     pub pad_y: Option<usize>,
     pub border_color: Option<String>,
     pub background: Option<String>,
+    pub bg_gradient: Option<String>,
     pub shadow: Option<bool>,
     pub shadow_color: Option<String>,
     pub outline: Option<bool>,
     pub outline_color: Option<String>,
     pub scale: Option<usize>,
+    pub icon: Option<String>,
+    pub letter_spacing: Option<usize>,
+    pub subtitle: Option<String>,
+    pub subtitle_font: Option<String>,
+    pub fit: Option<usize>,
     pub title: Option<String>,
     pub margin: Option<usize>,
     pub margin_x: Option<usize>,
     pub min_width: Option<usize>,
+    pub wrap: Option<usize>,
     pub width: Option<usize>,
     pub animate: Option<String>,
     pub fps: Option<u32>,
     pub format: Option<String>,
+    pub func: Option<bool>,
     /// User-defined named gradients: name -> list of hex stops.
     pub gradients: HashMap<String, Vec<String>>,
     /// User-defined themes: name -> coordinated option bundle.
@@ -86,10 +97,13 @@ impl Config {
         overlay!(
             gradient,
             colors,
+            from,
+            gradient_file,
             font,
             direction,
             align,
             color_by,
+            fill,
             interpolate,
             angle,
             reverse,
@@ -100,19 +114,27 @@ impl Config {
             pad_y,
             border_color,
             background,
+            bg_gradient,
             shadow,
             shadow_color,
             outline,
             outline_color,
             scale,
+            icon,
+            letter_spacing,
+            subtitle,
+            subtitle_font,
+            fit,
             title,
             margin,
             margin_x,
             min_width,
+            wrap,
             width,
             animate,
             fps,
             format,
+            func,
         );
         // Named gradients and themes merge per-key (project entries win).
         for (name, stops) in other.gradients {
@@ -141,6 +163,7 @@ pub const STARTER: &str = "\
 # --- color ---
 # gradient    = \"vaporwave\"      # a preset, or define one under [gradients]
 # colors      = \"#ff5f6d,#ffc371\" # custom stops (overrides gradient)
+# from        = \"#ff5f6d\"        # derive a gradient from one brand color
 # interpolate = \"oklab\"          # oklab | rgb | hsl
 # color_by    = \"banner\"         # banner | line | char
 # direction   = \"horizontal\"     # horizontal | vertical | diagonal
@@ -153,6 +176,7 @@ pub const STARTER: &str = "\
 # align   = \"center\"             # left | center | right
 # margin  = 0                     # blank lines above/below
 # width   = 80                    # alignment width (default: terminal)
+# wrap    = 60                    # word-wrap long text to fit N columns
 
 # --- frame & effects ---
 # border       = \"round\"         # none | round | single | double | heavy | ascii

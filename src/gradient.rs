@@ -27,18 +27,57 @@ impl Interp {
 }
 
 /// A multi-stop gradient over sRGB stops, blended in a chosen [`Interp`] space.
+///
+/// `positions` holds each stop's location in `[0, 1]`, ascending; for an evenly
+/// spaced gradient they are `0, 1/(n-1), … 1`, but callers can supply custom
+/// positions to bias the blend.
 #[derive(Clone, Debug)]
 pub struct Gradient {
     stops: Vec<Rgb>,
+    positions: Vec<f32>,
     interp: Interp,
 }
 
 impl Gradient {
-    /// Build a gradient from one or more sRGB stops (Oklab blending by default).
+    /// Build a gradient from one or more evenly spaced sRGB stops (Oklab
+    /// blending by default).
     pub fn new(stops: &[Rgb]) -> Gradient {
         assert!(!stops.is_empty(), "gradient needs at least one stop");
+        let n = stops.len();
+        let positions = (0..n)
+            .map(|i| {
+                if n == 1 {
+                    0.0
+                } else {
+                    i as f32 / (n - 1) as f32
+                }
+            })
+            .collect();
         Gradient {
             stops: stops.to_vec(),
+            positions,
+            interp: Interp::default(),
+        }
+    }
+
+    /// Build a gradient from stops at explicit positions in `[0, 1]`.
+    ///
+    /// Positions are sorted with their stops, so callers need not pre-sort. Must
+    /// be the same length as `stops` and non-empty.
+    pub fn with_positions(stops: &[Rgb], positions: &[f32]) -> Gradient {
+        assert!(
+            !stops.is_empty() && stops.len() == positions.len(),
+            "positioned gradient needs matching, non-empty stops and positions"
+        );
+        let mut pairs: Vec<(f32, Rgb)> = positions
+            .iter()
+            .map(|p| p.clamp(0.0, 1.0))
+            .zip(stops.iter().copied())
+            .collect();
+        pairs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+        Gradient {
+            stops: pairs.iter().map(|(_, c)| *c).collect(),
+            positions: pairs.iter().map(|(p, _)| *p).collect(),
             interp: Interp::default(),
         }
     }
@@ -55,10 +94,17 @@ impl Gradient {
         if self.stops.len() == 1 {
             return self.stops[0];
         }
-        let segments = self.stops.len() - 1;
-        let scaled = t * segments as f32;
-        let idx = (scaled.floor() as usize).min(segments - 1);
-        let local = scaled - idx as f32;
+        // Find the segment whose position range contains `t`.
+        let mut idx = 0;
+        while idx + 2 < self.stops.len() && t > self.positions[idx + 1] {
+            idx += 1;
+        }
+        let (p0, p1) = (self.positions[idx], self.positions[idx + 1]);
+        let local = if (p1 - p0).abs() < 1e-6 {
+            0.0
+        } else {
+            ((t - p0) / (p1 - p0)).clamp(0.0, 1.0)
+        };
         let (a, b) = (self.stops[idx], self.stops[idx + 1]);
         match self.interp {
             Interp::Oklab => a.to_oklab().lerp(b.to_oklab(), local).to_rgb(),
@@ -91,6 +137,12 @@ impl Gradient {
             "berry" => &[0x8a2387, 0xe94057, 0xf27121],
             "steel" => &[0xbdc3c7, 0x2c3e50],
             "forest" => &[0x134e5e, 0x71b280],
+            "coral" => &[0xff7e5f, 0xfeb47b],
+            "glacier" => &[0x2c3e50, 0x4ca1af],
+            "nebula" => &[0x654ea3, 0xeaafc8],
+            "moss" => &[0x304529, 0x7bb661],
+            "peach" => &[0xffecd2, 0xfcb69f],
+            "twilight" => &[0x355c7d, 0x6c5b7b, 0xc06c84],
             _ => return None,
         };
         Some(Gradient::new(
@@ -99,6 +151,34 @@ impl Gradient {
                 .map(|&n| Rgb::new((n >> 16) as u8, (n >> 8) as u8, n as u8))
                 .collect::<Vec<_>>(),
         ))
+    }
+
+    /// Build a pleasing gradient from a single base color.
+    ///
+    /// A flat fill is dull, so we spread the one color into a soft two-tone
+    /// sweep: a slightly darker, hue-nudged low end, through the base, into a
+    /// lighter, oppositely-nudged high end. All of it happens in Oklab, so the
+    /// lightness ramp stays perceptually even and the base color is still
+    /// clearly recognizable in the middle.
+    pub fn from_color(base: Rgb) -> Gradient {
+        let ok = base.to_oklab();
+        let chroma = (ok.a * ok.a + ok.b * ok.b).sqrt();
+        let hue = ok.b.atan2(ok.a);
+        // Reconstruct an Oklab color at a rotated hue with explicit L and chroma.
+        let at = |dh_deg: f32, l: f32, c: f32| {
+            let h = hue + dh_deg.to_radians();
+            crate::color::Oklab {
+                l: l.clamp(0.0, 1.0),
+                a: c * h.cos(),
+                b: c * h.sin(),
+            }
+            .to_rgb()
+        };
+        // Low: a touch darker, hue nudged one way, full chroma for richness.
+        let low = at(-12.0, ok.l * 0.82, chroma);
+        // High: lighter, hue nudged the other way, chroma eased so it glows.
+        let high = at(14.0, ok.l + (1.0 - ok.l) * 0.45, chroma * 0.9);
+        Gradient::new(&[low, base, high])
     }
 
     /// Names of all built-in presets, in display order.
@@ -125,6 +205,12 @@ impl Gradient {
             "berry",
             "steel",
             "forest",
+            "coral",
+            "glacier",
+            "nebula",
+            "moss",
+            "peach",
+            "twilight",
         ]
     }
 }
@@ -139,6 +225,10 @@ pub enum Direction {
     Vertical,
     Diagonal,
     Angle(f32),
+    /// Sweeps outward from the banner's center (a ring gradient).
+    Radial,
+    /// Sweeps around the banner's center (a cone/angle gradient).
+    Conic,
 }
 
 impl Direction {
@@ -151,6 +241,16 @@ impl Direction {
             Direction::Vertical => fy,
             Direction::Diagonal => (fx + fy) * 0.5,
             Direction::Angle(deg) => project(fx, fy, deg),
+            // Distance from center, normalized so a corner reaches 1.0.
+            Direction::Radial => {
+                let (dx, dy) = (fx - 0.5, fy - 0.5);
+                ((dx * dx + dy * dy).sqrt() / std::f32::consts::FRAC_1_SQRT_2).clamp(0.0, 1.0)
+            }
+            // Angle around the center, normalized to [0, 1) starting at due west.
+            Direction::Conic => {
+                let a = (fy - 0.5).atan2(fx - 0.5); // -PI..=PI
+                (a + std::f32::consts::PI) / std::f32::consts::TAU
+            }
         }
     }
 
@@ -159,8 +259,10 @@ impl Direction {
             "horizontal" | "h" => Ok(Direction::Horizontal),
             "vertical" | "v" => Ok(Direction::Vertical),
             "diagonal" | "d" => Ok(Direction::Diagonal),
+            "radial" | "ring" => Ok(Direction::Radial),
+            "conic" | "cone" => Ok(Direction::Conic),
             _ => Err(format!(
-                "unknown direction: {s} (horizontal|vertical|diagonal)"
+                "unknown direction: {s} (horizontal|vertical|diagonal|radial|conic)"
             )),
         }
     }
@@ -294,11 +396,108 @@ mod tests {
     }
 
     #[test]
+    fn from_color_spans_light_to_dark_around_base() {
+        let base = Rgb::new(0xff, 0x5f, 0x6d);
+        let g = Gradient::from_color(base);
+        // Low end is darker than the high end (perceptual lightness ordering).
+        let low = g.sample(0.0).to_oklab().l;
+        let high = g.sample(1.0).to_oklab().l;
+        assert!(low < high, "expected low {low} < high {high}");
+        // The middle stays close to the base color it was derived from.
+        let mid = g.sample(0.5);
+        let d = |a: u8, b: u8| (a as i16 - b as i16).abs();
+        assert!(
+            d(mid.r, base.r) + d(mid.g, base.g) + d(mid.b, base.b) < 30,
+            "middle {mid:?} drifted from base {base:?}"
+        );
+    }
+
+    #[test]
+    fn from_color_handles_gray() {
+        // Near-gray has undefined hue; it must not panic or produce NaNs.
+        let g = Gradient::from_color(Rgb::new(128, 128, 128));
+        let _ = g.sample(0.0);
+        let _ = g.sample(1.0);
+    }
+
+    #[test]
     fn all_presets_resolve() {
         for name in Gradient::preset_names() {
             assert!(Gradient::preset(name).is_some(), "missing preset {name}");
         }
         assert!(Gradient::preset("nonsense").is_none());
+    }
+
+    #[test]
+    fn sampling_is_total_and_endpoints_pin() {
+        // Property: every preset samples cleanly across the whole range in every
+        // interpolation space, and the endpoints equal the first/last stop.
+        for name in Gradient::preset_names() {
+            for interp in [Interp::Oklab, Interp::Rgb, Interp::Hsl] {
+                let g = Gradient::preset(name).unwrap().with_interp(interp);
+                for i in 0..=64 {
+                    let _ = g.sample(i as f32 / 64.0); // must not panic
+                }
+                // Out-of-range t is clamped, not undefined.
+                assert_eq!(g.sample(-1.0), g.sample(0.0));
+                assert_eq!(g.sample(2.0), g.sample(1.0));
+            }
+        }
+    }
+
+    #[test]
+    fn adjust_t_stays_in_unit_range() {
+        for cycle in [1u32, 2, 5] {
+            for rev in [false, true] {
+                for i in 0..=100 {
+                    let t = adjust_t(i as f32 / 100.0, rev, cycle);
+                    assert!((0.0..=1.0).contains(&t), "adjust_t out of range: {t}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn positioned_stops_bias_the_blend() {
+        let black = Rgb::new(0, 0, 0);
+        let white = Rgb::new(255, 255, 255);
+        // White doesn't start until t=0.8, so t=0.5 is still solid black.
+        let g = Gradient::with_positions(&[black, white], &[0.8, 1.0]).with_interp(Interp::Rgb);
+        assert_eq!(g.sample(0.0), black);
+        assert_eq!(g.sample(0.5), black);
+        // ~90% of the way, i.e. about halfway through the 0.8–1.0 segment: mid-gray.
+        let mid = g.sample(0.9);
+        assert!(
+            (mid.r as i16 - 128).abs() <= 2,
+            "expected ~mid-gray, got {mid:?}"
+        );
+        assert_eq!(g.sample(1.0), white);
+    }
+
+    #[test]
+    fn with_positions_sorts_unordered_input() {
+        let a = Rgb::new(10, 0, 0);
+        let b = Rgb::new(0, 0, 10);
+        // Positions given out of order are sorted with their stops.
+        let g = Gradient::with_positions(&[a, b], &[1.0, 0.0]);
+        assert_eq!(g.sample(0.0), b);
+        assert_eq!(g.sample(1.0), a);
+    }
+
+    #[test]
+    fn radial_and_conic_parse_and_bound() {
+        assert_eq!(Direction::parse("radial").unwrap(), Direction::Radial);
+        assert_eq!(Direction::parse("conic").unwrap(), Direction::Conic);
+        // Center is the low point of a radial sweep; a corner reaches the top.
+        let center = Direction::Radial.t(2, 2, 5, 5);
+        let corner = Direction::Radial.t(0, 0, 5, 5);
+        assert!(center < 0.01);
+        assert!((corner - 1.0).abs() < 1e-4);
+        // Conic stays within [0, 1] all the way around.
+        for (r, c) in [(0, 0), (0, 4), (4, 0), (4, 4), (2, 2)] {
+            let t = Direction::Conic.t(r, c, 5, 5);
+            assert!((0.0..=1.0).contains(&t), "conic t out of range: {t}");
+        }
     }
 
     #[test]

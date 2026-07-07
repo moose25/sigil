@@ -14,6 +14,7 @@ pub mod config;
 pub mod export;
 pub mod fonts;
 pub mod gradient;
+pub mod mark;
 pub mod render;
 pub mod text;
 pub mod themes;

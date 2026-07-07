@@ -160,6 +160,92 @@ impl Banner {
         Ok(Banner { lines, width })
     }
 
+    /// Word-wrap `text` so each rendered line fits within `max_width` display
+    /// columns, then stack the wrapped lines like [`Banner::layout_multi`].
+    ///
+    /// Words are kept whole and packed greedily; a single word that renders
+    /// wider than `max_width` still gets its own line (we never split a word
+    /// mid-glyph). Wrapping is measured against the *rendered* banner width, so
+    /// it accounts for the font — not the raw character count.
+    pub fn layout_wrapped(font: &FIGfont, text: &str, max_width: usize) -> Result<Banner, String> {
+        let words: Vec<&str> = text.split_whitespace().collect();
+        if words.is_empty() {
+            return Banner::layout(font, "");
+        }
+        let mut lines: Vec<String> = Vec::new();
+        let mut current = String::new();
+        for word in words {
+            let candidate = if current.is_empty() {
+                word.to_string()
+            } else {
+                format!("{current} {word}")
+            };
+            // Keep the word on this line if it still fits, or if the line is
+            // empty (an oversized lone word has nowhere else to go).
+            if current.is_empty() || Banner::layout(font, &candidate)?.width <= max_width {
+                current = candidate;
+            } else {
+                lines.push(std::mem::take(&mut current));
+                current = word.to_string();
+            }
+        }
+        if !current.is_empty() {
+            lines.push(current);
+        }
+        let refs: Vec<&str> = lines.iter().map(String::as_str).collect();
+        Banner::layout_multi(font, &refs)
+    }
+
+    /// Render `text` with `spacing` extra blank columns between each glyph, for
+    /// an airier, letter-spaced look.
+    ///
+    /// Each character is laid out on its own and the rows are concatenated, so
+    /// the usual FIGlet kerning/smushing between neighbours is dropped in favour
+    /// of even, explicit spacing. `spacing == 0` still works (just no gap added).
+    pub fn layout_spaced(font: &FIGfont, text: &str, spacing: usize) -> Result<Banner, String> {
+        let text = crate::text::sanitize(text);
+        let gap = " ".repeat(spacing);
+        let mut rows: Vec<String> = Vec::new();
+        for (i, ch) in text.chars().enumerate() {
+            let figure = font
+                .convert(&ch.to_string())
+                .ok_or_else(|| format!("could not render {ch:?} with this font"))?;
+            let glyph: Vec<String> = figure.to_string().lines().map(str::to_string).collect();
+            // FIGlet glyphs share a fixed height, so every char has the same row
+            // count; seed `rows` from the first one.
+            if rows.is_empty() {
+                rows = vec![String::new(); glyph.len()];
+            }
+            for (r, line) in glyph.iter().enumerate() {
+                if r >= rows.len() {
+                    break;
+                }
+                if i > 0 {
+                    rows[r].push_str(&gap);
+                }
+                rows[r].push_str(line);
+            }
+        }
+        // Trim shared blank rows top and bottom, then pad to a common width.
+        while rows.first().is_some_and(|l| l.trim().is_empty()) {
+            rows.remove(0);
+        }
+        while rows.last().is_some_and(|l| l.trim().is_empty()) {
+            rows.pop();
+        }
+        if rows.is_empty() {
+            rows.push(String::new());
+        }
+        let width = rows.iter().map(|l| display_width(l)).max().unwrap_or(0);
+        for l in &mut rows {
+            let pad = width - display_width(l);
+            if pad > 0 {
+                l.push_str(&" ".repeat(pad));
+            }
+        }
+        Ok(Banner { lines: rows, width })
+    }
+
     /// Build a banner from existing multi-line art (not a FIGlet font): keep the
     /// characters as-is and pad to a common display width.
     pub fn from_art(content: &str) -> Banner {
@@ -178,6 +264,54 @@ impl Banner {
             }
         }
         Banner { lines, width }
+    }
+
+    /// Stack `bottom` beneath `top` into one banner, each centered within the
+    /// wider of the two, separated by `gap` blank rows.
+    ///
+    /// The two can come from different fonts — this is how a large headline and
+    /// a smaller subtitle become a single unit that shares one gradient, border,
+    /// and animation.
+    pub fn stacked(top: &Banner, bottom: &Banner, gap: usize) -> Banner {
+        let width = top.width.max(bottom.width);
+        let centered = |b: &Banner| -> Vec<String> {
+            b.lines
+                .iter()
+                .map(|l| {
+                    let pad = width - display_width(l);
+                    let left = pad / 2;
+                    format!("{}{}{}", " ".repeat(left), l, " ".repeat(pad - left))
+                })
+                .collect()
+        };
+        let mut lines = centered(top);
+        for _ in 0..gap {
+            lines.push(" ".repeat(width));
+        }
+        lines.extend(centered(bottom));
+        Banner { lines, width }
+    }
+
+    /// Prepend a small icon (an emoji or Nerd Font glyph) to the left of the
+    /// banner, vertically centered, with `gap` blank columns between it and the
+    /// text. The glyph renders at the terminal's normal cell size — an icon
+    /// beside a wordmark. A zero-width icon is ignored.
+    pub fn with_icon(mut self, icon: &str, gap: usize) -> Banner {
+        let iw = display_width(icon);
+        if iw == 0 {
+            return self;
+        }
+        let mid = self.lines.len() / 2;
+        let blank = " ".repeat(iw + gap);
+        for (i, line) in self.lines.iter_mut().enumerate() {
+            if i == mid {
+                *line = format!("{icon}{}{line}", " ".repeat(gap));
+            } else {
+                *line = format!("{blank}{line}");
+            }
+        }
+        self.width += iw + gap;
+        self
     }
 
     pub fn height(&self) -> usize {
@@ -209,6 +343,12 @@ pub struct RenderOptions {
     pub border_color: Option<Rgb>,
     /// Solid background fill behind the whole box; `None` leaves it bare.
     pub background: Option<Rgb>,
+    /// Gradient background fill behind the whole box (overrides `background`
+    /// where a cell is covered); `None` leaves the solid/base background.
+    pub background_gradient: Option<Gradient>,
+    /// Replace glyph characters with block-shade glyphs (░▒▓█) chosen by the
+    /// gradient's brightness, so the gradient reads even without color.
+    pub shade: bool,
     /// How the gradient is mapped across the banner.
     pub color_by: ColorBy,
     /// Drop-shadow color behind the glyphs; `None` disables the shadow.
@@ -412,6 +552,45 @@ pub fn cell_color(grid: &Grid, opts: &RenderOptions, row: usize, col: usize, pha
     opts.gradient.sample(t)
 }
 
+/// Pick a block-shade glyph for a color by its brightness — `░` for dim up to
+/// `█` for bright — so a gradient reads as varying density even without color.
+pub fn shade_glyph(c: Rgb) -> char {
+    const BLOCKS: [char; 4] = ['░', '▒', '▓', '█'];
+    let lum = (0.299 * c.r as f32 + 0.587 * c.g as f32 + 0.114 * c.b as f32) / 255.0;
+    let i = ((lum * BLOCKS.len() as f32) as usize).min(BLOCKS.len() - 1);
+    BLOCKS[i]
+}
+
+/// The glyph to draw for a cell: in shade mode, a block-shade char for glyph
+/// cells (frame/space cells are unchanged); otherwise the original character.
+fn shaded(
+    ch: char,
+    grid: &Grid,
+    opts: &RenderOptions,
+    row: usize,
+    col: usize,
+    fill: Option<Rgb>,
+) -> char {
+    if opts.shade && ch != ' ' && !grid.is_frame[row][col] {
+        shade_glyph(fill.unwrap_or_else(|| cell_color(grid, opts, row, col, 0.0)))
+    } else {
+        ch
+    }
+}
+
+/// Background color for a cell when `background_gradient` is set — sampled along
+/// the sweep direction across the whole box, honoring reverse/cycle. Returns
+/// `None` when there is no background gradient (callers fall back to the solid
+/// background or leave the cell bare).
+pub fn bg_cell_color(grid: &Grid, opts: &RenderOptions, row: usize, col: usize) -> Option<Rgb> {
+    let g = opts.background_gradient.as_ref()?;
+    let base = opts
+        .direction
+        .t(row, col, grid.height.max(1), grid.width.max(1));
+    let t = crate::gradient::adjust_t(base, opts.reverse, opts.cycle);
+    Some(g.sample(t))
+}
+
 /// Paint `banner` into a printable string with ANSI color escapes.
 pub fn paint(banner: &Banner, opts: &RenderOptions) -> String {
     let grid = compose(banner, opts);
@@ -428,34 +607,52 @@ pub fn paint(banner: &Banner, opts: &RenderOptions) -> String {
     for _ in 0..opts.margin_y {
         out.push('\n');
     }
-    // Background is applied per row (indent stays outside the fill) and cleared
-    // by the reset at each line's end.
-    let bg = opts
+    // Background: a solid fill is set once per row; a gradient fill is set
+    // per cell as it changes. Both are cleared by the reset at each line's end.
+    let color_on = opts.mode != ColorMode::None;
+    let has_bg_grad = color_on && opts.background_gradient.is_some();
+    let solid_bg = opts
         .background
-        .filter(|_| opts.mode != ColorMode::None)
+        .filter(|_| color_on && !has_bg_grad)
         .map(|c| opts.mode.bg(c));
 
     for row in 0..grid.height {
         out.push_str(&pad);
-        if let Some(bg) = &bg {
+        if let Some(bg) = &solid_bg {
             out.push_str(bg);
         }
-        let mut last: Option<Rgb> = None;
+        let mut last_fg: Option<Rgb> = None;
+        let mut last_bg: Option<Rgb> = None;
         for col in 0..grid.width {
             let ch = grid.chars[row][col];
             if ch == CONT {
                 continue; // second column of a wide glyph; already drawn
+            }
+            if has_bg_grad {
+                let bgc = bg_cell_color(&grid, opts, row, col);
+                if last_bg != bgc {
+                    if let Some(c) = bgc {
+                        out.push_str(&opts.mode.bg(c));
+                    }
+                    last_bg = bgc;
+                }
             }
             if ch == ' ' {
                 out.push(' ');
                 continue;
             }
             let color = cell_color(&grid, opts, row, col, 0.0);
-            if opts.mode != ColorMode::None && last != Some(color) {
+            if color_on && last_fg != Some(color) {
                 out.push_str(&opts.mode.fg(color));
-                last = Some(color);
+                last_fg = Some(color);
             }
-            out.push(ch);
+            // In shade mode, glyph cells become block-shade chars by brightness
+            // (frame/border chars keep their box-drawing glyphs).
+            if opts.shade && !grid.is_frame[row][col] {
+                out.push(shade_glyph(color));
+            } else {
+                out.push(ch);
+            }
         }
         out.push_str(opts.mode.reset());
         out.push('\n');
@@ -505,6 +702,23 @@ fn svg_impl(
         "<rect width=\"100%\" height=\"100%\" rx=\"8\" fill=\"{}\"/>\n",
         hex(bg)
     ));
+    // A gradient background is drawn as a grid of per-cell rects over the base.
+    if opts.background_gradient.is_some() {
+        for row in 0..grid.height {
+            for col in 0..grid.width {
+                if let Some(c) = bg_cell_color(&grid, opts, row, col) {
+                    s.push_str(&format!(
+                        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.2}\" height=\"{:.2}\" fill=\"{}\"/>\n",
+                        col as f32 * cell_w,
+                        row as f32 * line_h,
+                        cell_w + 0.5,
+                        line_h + 0.5,
+                        hex(c)
+                    ));
+                }
+            }
+        }
+    }
     s.push_str(&format!(
         "<text xml:space=\"preserve\" font-family=\"ui-monospace,SFMono-Regular,Menlo,Consolas,monospace\" \
          font-size=\"{font_size:.0}\" font-weight=\"bold\">\n"
@@ -546,7 +760,7 @@ fn svg_impl(
                 if ch != ' ' {
                     fill = cell_fill;
                 }
-                run.push(ch);
+                run.push(shaded(ch, &grid, opts, row, col, cell_fill));
             }
             push_span(&mut s, &run, fill);
         }
@@ -624,6 +838,16 @@ pub fn to_png(
             }
         }
     };
+    // Gradient background: paint each cell's backdrop before the glyphs.
+    if opts.background_gradient.is_some() {
+        for row in 0..grid.height {
+            for col in 0..grid.width {
+                if let Some(c) = bg_cell_color(&grid, opts, row, col) {
+                    fill(col * cw, row * ch, c);
+                }
+            }
+        }
+    }
     for row in 0..grid.height {
         for col in 0..grid.width {
             if grid.chars[row][col] == ' ' {
@@ -643,6 +867,81 @@ pub fn to_png(
         writer
             .write_image_data(&px)
             .map_err(|e| format!("png error: {e}"))?;
+    }
+    Ok(out)
+}
+
+/// Render the banner as an animated PNG (APNG) whose gradient sweeps, looping
+/// forever at `fps`. `frames` frames span one full pass of the palette.
+pub fn to_apng(
+    banner: &Banner,
+    opts: &RenderOptions,
+    background: Option<Rgb>,
+    scale: usize,
+    frames: usize,
+    fps: u32,
+) -> Result<Vec<u8>, String> {
+    let scale = scale.clamp(1, 10);
+    let (cw, ch) = (14 * scale, 28 * scale);
+    let grid = compose(banner, opts);
+    let (w, h) = (grid.width * cw, grid.height * ch);
+    if w == 0 || h == 0 {
+        return Err("nothing to render".into());
+    }
+    let bg = background.unwrap_or(Rgb::new(13, 17, 23));
+    let frames = frames.clamp(2, 120) as u32;
+    let fps = fps.clamp(1, 120) as u16;
+
+    let mut out = Vec::new();
+    {
+        let mut enc = png::Encoder::new(&mut out, w as u32, h as u32);
+        enc.set_color(png::ColorType::Rgb);
+        enc.set_depth(png::BitDepth::Eight);
+        enc.set_animated(frames, 0)
+            .map_err(|e| format!("apng error: {e}"))?; // 0 plays = loop forever
+        enc.set_frame_delay(1, fps)
+            .map_err(|e| format!("apng error: {e}"))?; // 1/fps seconds per frame
+        let mut writer = enc.write_header().map_err(|e| format!("png error: {e}"))?;
+        for f in 0..frames {
+            let phase = f as f32 / frames as f32;
+            let mut px = Vec::with_capacity(w * h * 3);
+            for _ in 0..(w * h) {
+                px.extend_from_slice(&[bg.r, bg.g, bg.b]);
+            }
+            let mut put = |x0: usize, y0: usize, c: Rgb| {
+                for y in y0..y0 + ch {
+                    let base = (y * w + x0) * 3;
+                    for x in 0..cw {
+                        let i = base + x * 3;
+                        px[i] = c.r;
+                        px[i + 1] = c.g;
+                        px[i + 2] = c.b;
+                    }
+                }
+            };
+            // Static gradient backdrop behind the shimmering glyphs.
+            if opts.background_gradient.is_some() {
+                for row in 0..grid.height {
+                    for col in 0..grid.width {
+                        if let Some(c) = bg_cell_color(&grid, opts, row, col) {
+                            put(col * cw, row * ch, c);
+                        }
+                    }
+                }
+            }
+            for row in 0..grid.height {
+                for col in 0..grid.width {
+                    if grid.chars[row][col] == ' ' {
+                        continue;
+                    }
+                    let c = cell_color(&grid, opts, row, col, phase);
+                    put(col * cw, row * ch, c);
+                }
+            }
+            writer
+                .write_image_data(&px)
+                .map_err(|e| format!("apng error: {e}"))?;
+        }
     }
     Ok(out)
 }
@@ -690,7 +989,34 @@ pub fn to_html(banner: &Banner, opts: &RenderOptions, background: Option<Rgb>) -
          display:inline-block;color:#fff\">",
         hex(bg)
     ));
+    let has_bg_grad = opts.background_gradient.is_some();
     for row in 0..grid.height {
+        if has_bg_grad {
+            // Per-cell spans so each cell can carry its own background color.
+            for col in 0..grid.width {
+                let ch = grid.chars[row][col];
+                if ch == CONT {
+                    continue;
+                }
+                let mut style = String::new();
+                if let Some(b) = bg_cell_color(&grid, opts, row, col) {
+                    style.push_str(&format!("background:{};", hex(b)));
+                }
+                if ch != ' ' {
+                    style.push_str(&format!(
+                        "color:{};",
+                        hex(cell_color(&grid, opts, row, col, 0.0))
+                    ));
+                }
+                let disp = shaded(ch, &grid, opts, row, col, None);
+                s.push_str(&format!(
+                    "<span style=\"{style}\">{}</span>",
+                    xml_escape(&disp.to_string())
+                ));
+            }
+            s.push('\n');
+            continue;
+        }
         let mut run = String::new();
         let mut fill: Option<Rgb> = None;
         for col in 0..grid.width {
@@ -710,7 +1036,7 @@ pub fn to_html(banner: &Banner, opts: &RenderOptions, background: Option<Rgb>) -
             if ch != ' ' {
                 fill = cell_fill;
             }
-            run.push(ch);
+            run.push(shaded(ch, &grid, opts, row, col, cell_fill));
         }
         push_html_span(&mut s, &run, fill);
         s.push('\n');
@@ -782,11 +1108,113 @@ mod tests {
             padding: (0, 0),
             border_color: None,
             background: None,
+            background_gradient: None,
+            shade: false,
             color_by: ColorBy::Banner,
             shadow: None,
             outline: None,
             title: None,
         }
+    }
+
+    #[test]
+    fn wrap_breaks_long_text_within_width() {
+        let f = font();
+        let full = Banner::layout(&f, "wrap this long title please").unwrap();
+        let limit = full.width / 2;
+        let wrapped = Banner::layout_wrapped(&f, "wrap this long title please", limit).unwrap();
+        // Wrapping produced a taller, narrower banner than the single line.
+        assert!(wrapped.height() > full.height());
+        assert!(wrapped.width <= full.width);
+    }
+
+    #[test]
+    fn wrap_keeps_oversized_word_on_its_own_line() {
+        let f = font();
+        // A width of 1 forces every word onto its own line, even though each
+        // single word is far wider than the limit.
+        let wrapped = Banner::layout_wrapped(&f, "alpha beta gamma", 1).unwrap();
+        let one = Banner::layout(&f, "alpha").unwrap();
+        // Three words → three stacked banners (plus blank separator rows).
+        assert!(wrapped.height() >= one.height() * 3);
+    }
+
+    #[test]
+    fn stacked_combines_and_centers() {
+        let f = font();
+        let top = Banner::layout(&f, "Headline").unwrap();
+        let bottom = Banner::layout(&f, "sub").unwrap();
+        let s = Banner::stacked(&top, &bottom, 1);
+        assert_eq!(s.width, top.width.max(bottom.width));
+        assert_eq!(s.height(), top.height() + 1 + bottom.height());
+        assert!(s.lines.iter().all(|l| display_width(l) == s.width));
+    }
+
+    #[test]
+    fn letter_spacing_widens_banner() {
+        let f = font();
+        let tight = Banner::layout(&f, "AB").unwrap();
+        let spaced = Banner::layout_spaced(&f, "AB", 4).unwrap();
+        assert!(spaced.width > tight.width);
+        assert_eq!(spaced.height(), tight.height());
+        assert!(spaced
+            .lines
+            .iter()
+            .all(|l| display_width(l) == spaced.width));
+    }
+
+    #[test]
+    fn icon_prefixes_and_widens() {
+        let b = Banner::layout(&font(), "Hi").unwrap();
+        let w0 = b.width;
+        let iced = b.with_icon("*", 2);
+        assert_eq!(iced.width, w0 + 1 + 2); // icon width 1 + gap 2
+                                            // The middle row carries the icon; every row grew to the new width.
+        let mid = &iced.lines[iced.lines.len() / 2];
+        assert!(mid.starts_with('*'));
+        assert!(iced.lines.iter().all(|l| display_width(l) == iced.width));
+    }
+
+    #[test]
+    fn shade_mode_uses_block_glyphs() {
+        let b = Banner::layout(&font(), "Hi").unwrap();
+        let mut opts = base_opts(ColorMode::None);
+        opts.shade = true;
+        let out = paint(&b, &opts);
+        // Glyph cells become block-shade chars; the original '_'/'|' are gone.
+        assert!(out.chars().any(|c| "░▒▓█".contains(c)));
+        // shade_glyph maps brightness low→high onto ░ … █.
+        assert_eq!(shade_glyph(Rgb::new(0, 0, 0)), '░');
+        assert_eq!(shade_glyph(Rgb::new(255, 255, 255)), '█');
+    }
+
+    #[test]
+    fn background_gradient_adds_svg_cells() {
+        let b = Banner::layout(&font(), "Hi").unwrap();
+        let plain = to_svg(&b, &base_opts(ColorMode::True), None);
+        let mut opts = base_opts(ColorMode::True);
+        opts.background_gradient = Some(Gradient::preset("dusk").unwrap());
+        let washed = to_svg(&b, &opts, None);
+        // The bg gradient adds a per-cell rect grid, so there are more rects.
+        assert!(washed.matches("<rect").count() > plain.matches("<rect").count());
+        // And bg_cell_color yields a color where a gradient is set (none otherwise).
+        let grid = compose(&b, &opts);
+        assert!(bg_cell_color(&grid, &opts, 0, 0).is_some());
+        assert!(bg_cell_color(&grid, &base_opts(ColorMode::True), 0, 0).is_none());
+    }
+
+    #[test]
+    fn apng_has_animation_chunks() {
+        let b = Banner::layout(&font(), "Hi").unwrap();
+        let bytes = to_apng(&b, &base_opts(ColorMode::True), None, 1, 6, 30).unwrap();
+        assert_eq!(
+            &bytes[..8],
+            &[0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1a, b'\n']
+        );
+        // acTL marks an animated PNG; one fcTL per frame.
+        let count = |needle: &[u8]| bytes.windows(4).filter(|w| *w == needle).count();
+        assert!(count(b"acTL") >= 1, "missing acTL (not animated)");
+        assert_eq!(count(b"fcTL"), 6, "expected one fcTL per frame");
     }
 
     #[test]
