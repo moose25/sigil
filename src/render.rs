@@ -745,6 +745,69 @@ pub fn to_png(
     Ok(out)
 }
 
+/// Render the banner as an animated PNG (APNG) whose gradient sweeps, looping
+/// forever at `fps`. `frames` frames span one full pass of the palette.
+pub fn to_apng(
+    banner: &Banner,
+    opts: &RenderOptions,
+    background: Option<Rgb>,
+    scale: usize,
+    frames: usize,
+    fps: u32,
+) -> Result<Vec<u8>, String> {
+    let scale = scale.clamp(1, 10);
+    let (cw, ch) = (14 * scale, 28 * scale);
+    let grid = compose(banner, opts);
+    let (w, h) = (grid.width * cw, grid.height * ch);
+    if w == 0 || h == 0 {
+        return Err("nothing to render".into());
+    }
+    let bg = background.unwrap_or(Rgb::new(13, 17, 23));
+    let frames = frames.clamp(2, 120) as u32;
+    let fps = fps.clamp(1, 120) as u16;
+
+    let mut out = Vec::new();
+    {
+        let mut enc = png::Encoder::new(&mut out, w as u32, h as u32);
+        enc.set_color(png::ColorType::Rgb);
+        enc.set_depth(png::BitDepth::Eight);
+        enc.set_animated(frames, 0)
+            .map_err(|e| format!("apng error: {e}"))?; // 0 plays = loop forever
+        enc.set_frame_delay(1, fps)
+            .map_err(|e| format!("apng error: {e}"))?; // 1/fps seconds per frame
+        let mut writer = enc.write_header().map_err(|e| format!("png error: {e}"))?;
+        for f in 0..frames {
+            let phase = f as f32 / frames as f32;
+            let mut px = Vec::with_capacity(w * h * 3);
+            for _ in 0..(w * h) {
+                px.extend_from_slice(&[bg.r, bg.g, bg.b]);
+            }
+            for row in 0..grid.height {
+                for col in 0..grid.width {
+                    if grid.chars[row][col] == ' ' {
+                        continue;
+                    }
+                    let c = cell_color(&grid, opts, row, col, phase);
+                    let (x0, y0) = (col * cw, row * ch);
+                    for y in y0..y0 + ch {
+                        let base = (y * w + x0) * 3;
+                        for x in 0..cw {
+                            let i = base + x * 3;
+                            px[i] = c.r;
+                            px[i + 1] = c.g;
+                            px[i + 2] = c.b;
+                        }
+                    }
+                }
+            }
+            writer
+                .write_image_data(&px)
+                .map_err(|e| format!("apng error: {e}"))?;
+        }
+    }
+    Ok(out)
+}
+
 /// Render the banner as JSON: dimensions plus per-cell char and hex color
 /// (null for spaces), for programmatic consumers.
 pub fn to_json(banner: &Banner, opts: &RenderOptions) -> String {
@@ -921,6 +984,20 @@ mod tests {
         let mid = &iced.lines[iced.lines.len() / 2];
         assert!(mid.starts_with('*'));
         assert!(iced.lines.iter().all(|l| display_width(l) == iced.width));
+    }
+
+    #[test]
+    fn apng_has_animation_chunks() {
+        let b = Banner::layout(&font(), "Hi").unwrap();
+        let bytes = to_apng(&b, &base_opts(ColorMode::True), None, 1, 6, 30).unwrap();
+        assert_eq!(
+            &bytes[..8],
+            &[0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1a, b'\n']
+        );
+        // acTL marks an animated PNG; one fcTL per frame.
+        let count = |needle: &[u8]| bytes.windows(4).filter(|w| *w == needle).count();
+        assert!(count(b"acTL") >= 1, "missing acTL (not animated)");
+        assert_eq!(count(b"fcTL"), 6, "expected one fcTL per frame");
     }
 
     #[test]

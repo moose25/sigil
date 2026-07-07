@@ -650,7 +650,12 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         if s.copy {
             return Err("cannot copy binary (png) to the clipboard".into());
         }
-        let bytes = sigil::render::to_png(&banner, &opts, background, s.scale)?;
+        // --animate sweep produces an animated PNG (a looping gradient shimmer).
+        let bytes = if anim == Anim::Sweep {
+            sigil::render::to_apng(&banner, &opts, background, s.scale, 30, s.fps)?
+        } else {
+            sigil::render::to_png(&banner, &opts, background, s.scale)?
+        };
         return write_bytes(s.out.as_deref(), &bytes);
     }
 

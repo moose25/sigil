@@ -63,6 +63,7 @@ Run `sigil demo` to see the showcase live, or try an animation:
 sigil "launch" -g fire --animate sweep
 sigil "ready"  --animate type --fps 60
 sigil "loop"   -g rainbow --animate scroll
+sigil "shimmer" -g fire --animate sweep -F png -o banner.png  # animated PNG (APNG)
 ```
 
 ## Usage
