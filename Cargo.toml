@@ -2,8 +2,15 @@
 name = "sigil"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.74"
 description = "Give your CLI a face — modern gradient ASCII banners for your projects."
 license = "MIT"
+readme = "README.md"
+repository = "https://github.com/moose25/sigil"
+homepage = "https://github.com/moose25/sigil"
+keywords = ["ascii", "banner", "figlet", "gradient", "cli"]
+categories = ["command-line-utilities", "text-processing"]
+exclude = ["assets/", "demo.tape", ".github/"]
 
 [[bin]]
 name = "sigil"
