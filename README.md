@@ -36,8 +36,35 @@ sigil demo                     # see a showcase of fonts, gradients, and effects
 
 ## Gallery
 
-A few of the combinations sigil can produce — every image below was generated
-with `sigil … -F svg` (see the command under each):
+**As simple or as elaborate as you like.** Reach for one flat color and a small
+font, or pile on a gradient, a frame, a theme, and effects — sigil scales from a
+quiet mark to a full statement. Here's the same word at three levels of styling,
+in a single image:
+
+<p align="center">
+  <img src="assets/showcase-stack.svg" alt="the same word rendered large and styled, medium, and small and plain" width="300">
+</p>
+
+### The spectrum, one step at a time
+
+Each step just adds one thing to the last (command under each):
+
+<table>
+  <tr>
+    <td align="center"><img src="assets/spectrum-1-plain.svg" alt="one flat color, small font" width="200"><br><sub><code>-f small -c "#8ab4f8"</code><br>one flat color</sub></td>
+    <td align="center"><img src="assets/spectrum-2-color.svg" alt="one flat color" width="200"><br><sub><code>-c "#f7768e"</code><br>+ a bigger font</sub></td>
+    <td align="center"><img src="assets/spectrum-3-gradient.svg" alt="a gradient" width="200"><br><sub><code>-g ocean</code><br>+ a gradient</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/spectrum-4-framed.svg" alt="gradient in a rounded frame" width="200"><br><sub><code>-f small -g mint -b round</code><br>+ a frame</sub></td>
+    <td align="center"><img src="assets/spectrum-5-themed.svg" alt="cyberpunk theme" width="200"><br><sub><code>--theme cyberpunk</code><br>+ a theme</sub></td>
+    <td align="center"><img src="assets/spectrum-6-max.svg" alt="big font, gradient, double border, shadow" width="200"><br><sub><code>-f big -g sunset -b double --shadow</code><br>the works</sub></td>
+  </tr>
+</table>
+
+### More combinations
+
+Every image below was generated with `sigil … -F svg` (see the command under each):
 
 <table>
   <tr>
@@ -211,6 +238,10 @@ Contributions welcome. The codebase is small and modular:
 - `render` — layout, the cell grid, effects, and the SVG/HTML/PNG/JSON renderers
 - `animate` — terminal animations
 - `text` / `config` / `themes` / `export` — input folding, config, themes, formats
+
+The README's showcase images are regenerated from sigil itself with
+`bash assets/generate.sh` (it shells out to `sigil -F svg` and stacks a few
+renders with `assets/compose.py`).
 
 Ideas and open work are tracked in [issues](../../issues) and grouped by
 milestone. See [CHANGELOG.md](CHANGELOG.md) for the feature history.
