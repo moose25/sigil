@@ -128,6 +128,7 @@ sigil "Acme" -g sunset -F ansi   > banner.ansi      # raw colored ANSI bytes
 sigil "Acme" -g sunset -F svg    > banner.svg        # standalone SVG image
 sigil "Acme" -g sunset -F html   > banner.html       # standalone HTML page
 sigil "Acme" -g sunset -F png -o banner.png          # PNG raster image
+sigil "Acme" -g sunset -F png --scale 3 -o big.png   # 3x-resolution PNG
 ```
 
 `-F svg` produces a self-contained SVG (colored monospace grid on a dark
