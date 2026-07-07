@@ -27,6 +27,28 @@ Once published to crates.io: `cargo install sigil`.
 sigil "My Project" --gradient sunset
 ```
 
+## Gallery
+
+Fonts, borders, and a smooth Oklab gradient (shown here without color):
+
+```text
+███████╗██╗ ██████╗ ██╗██╗       ╭────────────────────────────────────╮
+██╔════╝██║██╔════╝ ██║██║       │                                    │
+███████╗██║██║  ███╗██║██║       │    _                           _   │
+╚════██║██║██║   ██║██║██║       │   | |__   ___  __ __  ___   __| |  │
+███████║██║╚██████╔╝██║███████╗   │   | '_ \ / _ \ \ \ / / -_) / _` |  │
+╚══════╝╚═╝ ╚═════╝ ╚═╝╚══════╝   │   |_.__/ \___/ /_\_\ \___| \__,_|  │
+     -f ansishadow                ╰────────────────────────────────────╯
+```
+
+Animated preview (gradient shimmer + typewriter reveal): run `vhs demo.tape` to
+generate `demo.gif` — see [`demo.tape`](demo.tape). Or just try it live:
+
+```sh
+sigil "launch" -g fire --animate sweep
+sigil "ready"  --animate type --fps 60
+```
+
 ## Usage
 
 ```sh
@@ -121,7 +143,7 @@ sigil man              > sigil.1               # roff man page
 
 ## Roadmap
 
-Tracked in [issues](../../issues): unicode-width correctness and a demo gif.
+Tracked in [issues](../../issues): unicode-width correctness, and further polish as it surfaces.
 
 ## License
 
