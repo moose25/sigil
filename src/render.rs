@@ -71,9 +71,13 @@ pub struct Banner {
 
 impl Banner {
     /// Render `text` through `font` into padded glyph rows.
+    ///
+    /// Input is folded to renderable ASCII first (see [`crate::text::sanitize`])
+    /// so non-ASCII text degrades gracefully instead of failing.
     pub fn layout(font: &FIGfont, text: &str) -> Result<Banner, String> {
+        let text = crate::text::sanitize(text);
         let figure = font
-            .convert(text)
+            .convert(&text)
             .ok_or_else(|| format!("could not render {text:?} with this font"))?;
         let raw = figure.to_string();
 
