@@ -12,6 +12,16 @@ keywords = ["ascii", "banner", "figlet", "gradient", "cli"]
 categories = ["command-line-utilities", "text-processing"]
 exclude = ["assets/", "demo.tape", ".github/"]
 
+# `cargo binstall sigil` — fetch prebuilt release archives instead of building.
+# Matches the taiki-e/upload-rust-binary-action assets (sigil-<target>.<ext>).
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }{ archive-suffix }"
+pkg-fmt = "tgz"
+bin-dir = "{ bin }{ binary-ext }"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-fmt = "zip"
+
 [[bin]]
 name = "sigil"
 path = "src/main.rs"

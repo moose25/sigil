@@ -23,6 +23,9 @@ cargo install --git https://github.com/moose25/sigil
 
 # Prebuilt binaries: grab the archive for your platform from the Releases page,
 # then move `sigil` onto your PATH.
+
+# Or fetch a prebuilt binary with cargo-binstall (no compile):
+cargo binstall sigil
 ```
 
 Once published to crates.io: `cargo install sigil`.
