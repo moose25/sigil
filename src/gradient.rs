@@ -91,6 +91,12 @@ impl Gradient {
             "berry" => &[0x8a2387, 0xe94057, 0xf27121],
             "steel" => &[0xbdc3c7, 0x2c3e50],
             "forest" => &[0x134e5e, 0x71b280],
+            "coral" => &[0xff7e5f, 0xfeb47b],
+            "glacier" => &[0x2c3e50, 0x4ca1af],
+            "nebula" => &[0x654ea3, 0xeaafc8],
+            "moss" => &[0x304529, 0x7bb661],
+            "peach" => &[0xffecd2, 0xfcb69f],
+            "twilight" => &[0x355c7d, 0x6c5b7b, 0xc06c84],
             _ => return None,
         };
         Some(Gradient::new(
@@ -125,6 +131,12 @@ impl Gradient {
             "berry",
             "steel",
             "forest",
+            "coral",
+            "glacier",
+            "nebula",
+            "moss",
+            "peach",
+            "twilight",
         ]
     }
 }
