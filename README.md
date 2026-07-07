@@ -90,7 +90,7 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 | ---- | ----------- | ------- |
 | `-g, --gradient <name>` | Named preset (see `sigil gradients`) | `ocean` |
 | `-c, --colors <hex,...>` | Custom gradient stops, e.g. `#ff5f6d,#ffc371` | — |
-| `-d, --direction <dir>` | `horizontal` \| `vertical` \| `diagonal` | `horizontal` |
+| `-d, --direction <dir>` | `horizontal` \| `vertical` \| `diagonal` \| `radial` \| `conic` | `horizontal` |
 | `--angle <deg>` | Sweep angle in degrees (overrides `--direction`) | — |
 | `--color-by <mode>` | `banner` \| `line` \| `char` (per-line / per-glyph coloring) | `banner` |
 | `--interpolate <space>` | Blend space: `oklab` \| `rgb` \| `hsl` | `oklab` |

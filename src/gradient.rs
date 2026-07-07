@@ -139,6 +139,10 @@ pub enum Direction {
     Vertical,
     Diagonal,
     Angle(f32),
+    /// Sweeps outward from the banner's center (a ring gradient).
+    Radial,
+    /// Sweeps around the banner's center (a cone/angle gradient).
+    Conic,
 }
 
 impl Direction {
@@ -151,6 +155,16 @@ impl Direction {
             Direction::Vertical => fy,
             Direction::Diagonal => (fx + fy) * 0.5,
             Direction::Angle(deg) => project(fx, fy, deg),
+            // Distance from center, normalized so a corner reaches 1.0.
+            Direction::Radial => {
+                let (dx, dy) = (fx - 0.5, fy - 0.5);
+                ((dx * dx + dy * dy).sqrt() / std::f32::consts::FRAC_1_SQRT_2).clamp(0.0, 1.0)
+            }
+            // Angle around the center, normalized to [0, 1) starting at due west.
+            Direction::Conic => {
+                let a = (fy - 0.5).atan2(fx - 0.5); // -PI..=PI
+                (a + std::f32::consts::PI) / std::f32::consts::TAU
+            }
         }
     }
 
@@ -159,8 +173,10 @@ impl Direction {
             "horizontal" | "h" => Ok(Direction::Horizontal),
             "vertical" | "v" => Ok(Direction::Vertical),
             "diagonal" | "d" => Ok(Direction::Diagonal),
+            "radial" | "ring" => Ok(Direction::Radial),
+            "conic" | "cone" => Ok(Direction::Conic),
             _ => Err(format!(
-                "unknown direction: {s} (horizontal|vertical|diagonal)"
+                "unknown direction: {s} (horizontal|vertical|diagonal|radial|conic)"
             )),
         }
     }
@@ -299,6 +315,22 @@ mod tests {
             assert!(Gradient::preset(name).is_some(), "missing preset {name}");
         }
         assert!(Gradient::preset("nonsense").is_none());
+    }
+
+    #[test]
+    fn radial_and_conic_parse_and_bound() {
+        assert_eq!(Direction::parse("radial").unwrap(), Direction::Radial);
+        assert_eq!(Direction::parse("conic").unwrap(), Direction::Conic);
+        // Center is the low point of a radial sweep; a corner reaches the top.
+        let center = Direction::Radial.t(2, 2, 5, 5);
+        let corner = Direction::Radial.t(0, 0, 5, 5);
+        assert!(center < 0.01);
+        assert!((corner - 1.0).abs() < 1e-4);
+        // Conic stays within [0, 1] all the way around.
+        for (r, c) in [(0, 0), (0, 4), (4, 0), (4, 4), (2, 2)] {
+            let t = Direction::Conic.t(r, c, 5, 5);
+            assert!((0.0..=1.0).contains(&t), "conic t out of range: {t}");
+        }
     }
 
     #[test]
