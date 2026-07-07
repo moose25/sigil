@@ -6,7 +6,9 @@
 //! - [`fonts`]: bundled FIGlet fonts, embedded in the binary
 //! - [`render`]: FIGlet layout and painting glyphs with a gradient
 //! - [`export`]: output formats (terminal, raw, and code snippets)
+//! - [`animate`]: terminal reveal animations (sweep, typewriter)
 
+pub mod animate;
 pub mod color;
 pub mod export;
 pub mod fonts;

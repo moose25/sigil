@@ -19,6 +19,8 @@ sigil "Hello" --gradient ocean --direction diagonal --align center
 sigil "Ship it" --colors "#ff5f6d,#ffc371"   # custom gradient stops
 sigil "Deploy" --font ansishadow             # pick a font
 echo "From stdin" | sigil                     # or pipe the text in
+sigil "Launching" -g fire --animate sweep     # animated shimmer (TTY only)
+sigil "Ready" --animate type --fps 60         # typewriter reveal
 sigil gradients                               # preview all presets
 sigil fonts                                   # preview all fonts
 sigil "plain" --no-color                      # respects NO_COLOR too
@@ -37,6 +39,8 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 | `-m, --margin <n>` | Blank lines above/below | `0` |
 | `-F, --format <fmt>` | `term` \| `ansi` \| `raw` \| `rust` \| `go` \| `python` \| `shell` | `term` |
 | `-o, --out <file>` | Write to a file instead of stdout | — |
+| `--animate <style>` | `none` \| `sweep` \| `type` (terminal only) | `none` |
+| `--fps <n>` | Animation speed, 1–120 | `30` |
 | `--no-color` | Disable color | — |
 
 ### Gradients
@@ -67,7 +71,7 @@ The `rust`/`go`/`python` snippets define a `BANNER` constant (with a comment sho
 
 ## Roadmap
 
-Tracked in [issues](../../issues): animated reveals, config files, borders, custom fonts, gradient angles, stdin input, packaging, and docs.
+Tracked in [issues](../../issues): config files, borders, custom fonts, gradient angles, packaging, and docs.
 
 ## License
 

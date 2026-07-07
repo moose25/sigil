@@ -3,6 +3,7 @@ use std::path::Path;
 
 use clap::{Parser, Subcommand};
 
+use sigil::animate::{self, Anim};
 use sigil::color::{ColorMode, Rgb};
 use sigil::export::{self, Format};
 use sigil::fonts;
@@ -57,6 +58,14 @@ struct Cli {
     /// Write output to a file instead of stdout.
     #[arg(short = 'o', long, value_name = "FILE")]
     out: Option<std::path::PathBuf>,
+
+    /// Animate the reveal on a terminal: none | sweep | type.
+    #[arg(long, default_value = "none")]
+    animate: String,
+
+    /// Animation speed in frames per second (1-120).
+    #[arg(long, default_value_t = 30)]
+    fps: u32,
 
     #[command(subcommand)]
     command: Option<Command>,
@@ -126,6 +135,18 @@ fn render_banner(cli: &Cli, text: &str) -> Result<(), String> {
     let align = Align::parse(&cli.align)?;
     let banner = Banner::layout(&font, text)?;
     let mode = color_mode(cli, format);
+    let anim = Anim::parse(&cli.animate)?;
+
+    // Animate only for live terminal output; snippets/files/pipes render static.
+    if anim.is_animated()
+        && format == Format::Term
+        && cli.out.is_none()
+        && std::io::stdout().is_terminal()
+    {
+        let mut out = std::io::stdout().lock();
+        return animate::play(&mut out, &banner, &gradient, mode, anim, cli.fps)
+            .map_err(|e| format!("animation error: {e}"));
+    }
 
     // Only direct terminal output gets terminal-width indentation and margins;
     // snippets and raw/ansi output stay tight to the banner's own width.
