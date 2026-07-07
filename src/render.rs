@@ -195,6 +195,8 @@ pub struct RenderOptions {
     pub target_width: usize,
     /// Extra blank lines above and below the banner.
     pub margin_y: usize,
+    /// Extra left indent (columns) added on top of alignment.
+    pub margin_x: usize,
     /// Flip the gradient's direction.
     pub reverse: bool,
     /// Repeat the palette this many times across the sweep.
@@ -420,7 +422,7 @@ pub fn paint(banner: &Banner, opts: &RenderOptions) -> String {
         Align::Center => slack / 2,
         Align::Right => slack,
     };
-    let pad = " ".repeat(indent);
+    let pad = " ".repeat(indent + opts.margin_x);
 
     let mut out = String::new();
     for _ in 0..opts.margin_y {
@@ -773,6 +775,7 @@ mod tests {
             mode,
             target_width: 80,
             margin_y: 0,
+            margin_x: 0,
             reverse: false,
             cycle: 1,
             border: None,

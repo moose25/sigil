@@ -108,6 +108,7 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 | `-f, --font <name>` | Font (see `sigil fonts`) | `standard` |
 | `-w, --width <cols>` | Target width for alignment | terminal width |
 | `-m, --margin <n>` | Blank lines above/below | `0` |
+| `--margin-x <n>` | Left indent in columns (on top of alignment) | `0` |
 | `-F, --format <fmt>` | `term` \| `ansi` \| `raw` \| `rust` \| `go` \| `python` \| `shell` | `term` |
 | `-o, --out <file>` | Write to a file instead of stdout | — |
 | `--animate <style>` | `none` \| `sweep` \| `type` \| `pulse` \| `scroll` (terminal only) | `none` |

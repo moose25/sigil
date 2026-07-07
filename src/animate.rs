@@ -254,6 +254,7 @@ mod tests {
             mode,
             target_width: 0,
             margin_y: 0,
+            margin_x: 0,
             reverse: false,
             cycle: 1,
             border,
