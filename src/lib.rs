@@ -17,4 +17,4 @@ pub mod render;
 
 pub use color::{ColorMode, Rgb};
 pub use gradient::{Direction, Gradient};
-pub use render::{paint, Align, Banner, RenderOptions};
+pub use render::{paint, Align, Banner, Border, RenderOptions};
