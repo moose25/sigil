@@ -65,7 +65,10 @@ fn png_writes_a_valid_file() {
     let out = run(&["Hi", "-F", "png", "-o", path.to_str().unwrap()]);
     assert!(out.status.success());
     let bytes = std::fs::read(&path).expect("png written");
-    assert_eq!(&bytes[..8], &[0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1a, b'\n']);
+    assert_eq!(
+        &bytes[..8],
+        &[0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1a, b'\n']
+    );
     let _ = std::fs::remove_file(&path);
 }
 
