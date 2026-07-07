@@ -53,6 +53,14 @@ struct Cli {
     #[arg(short = 'p', long)]
     padding: Option<usize>,
 
+    /// Horizontal interior padding (overrides --padding on the x axis).
+    #[arg(long)]
+    pad_x: Option<usize>,
+
+    /// Vertical interior padding (overrides --padding on the y axis).
+    #[arg(long)]
+    pad_y: Option<usize>,
+
     /// Solid frame color as a hex value (default: share the gradient).
     #[arg(long, value_name = "HEX")]
     border_color: Option<String>,
@@ -253,6 +261,8 @@ struct Settings {
     cycle: u32,
     border: String,
     padding: Option<usize>,
+    pad_x: Option<usize>,
+    pad_y: Option<usize>,
     border_color: Option<String>,
     background: Option<String>,
     margin: usize,
@@ -327,6 +337,8 @@ impl Settings {
             cycle: cli.cycle.or(theme.cycle).or(cfg.cycle).unwrap_or(1),
             border: pick(&cli.border, theme.border, cfg.border, "none"),
             padding: cli.padding.or(theme.padding).or(cfg.padding),
+            pad_x: cli.pad_x.or(cfg.pad_x),
+            pad_y: cli.pad_y.or(cfg.pad_y),
             border_color: cli
                 .border_color
                 .clone()
@@ -426,14 +438,22 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
     let anim = Anim::parse(&s.animate)?;
 
     let border = Border::parse(&s.border)?;
-    // Give a framed banner a little breathing room by default.
-    let padding = if border.is_some() {
+    // Give a framed banner a little breathing room by default; --pad-x/--pad-y
+    // override each axis.
+    let (mut px, mut py) = if border.is_some() {
         let p = s.padding.unwrap_or(1);
         (p + 1, p)
     } else {
         let p = s.padding.unwrap_or(0);
         (p, p)
     };
+    if let Some(x) = s.pad_x {
+        px = x;
+    }
+    if let Some(y) = s.pad_y {
+        py = y;
+    }
+    let padding = (px, py);
     let border_color = match &s.border_color {
         Some(hex) => Some(Rgb::parse(hex)?),
         None => None,
