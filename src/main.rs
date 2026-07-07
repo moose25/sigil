@@ -122,6 +122,10 @@ struct Cli {
     #[arg(short = 'm', long)]
     margin: Option<usize>,
 
+    /// Left indent in columns, added on top of alignment. [default: 0]
+    #[arg(long)]
+    margin_x: Option<usize>,
+
     /// Disable color output.
     #[arg(long)]
     no_color: bool,
@@ -266,6 +270,7 @@ struct Settings {
     border_color: Option<String>,
     background: Option<String>,
     margin: usize,
+    margin_x: usize,
     width: Option<usize>,
     format: String,
     out: Option<std::path::PathBuf>,
@@ -350,6 +355,7 @@ impl Settings {
                 .or(theme.background)
                 .or(cfg.background),
             margin: cli.margin.or(cfg.margin).unwrap_or(0),
+            margin_x: cli.margin_x.or(cfg.margin_x).unwrap_or(0),
             width: cli.width.or(cfg.width),
             format: pick(&cli.format, None, cfg.format, "term"),
             out: cli.out.clone(),
@@ -497,6 +503,7 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         mode,
         target_width,
         margin_y,
+        margin_x: s.margin_x,
         reverse: s.reverse,
         cycle: s.cycle,
         border,
@@ -752,6 +759,7 @@ fn preview_font(
         mode,
         target_width: 0,
         margin_y: 0,
+        margin_x: 0,
         reverse: false,
         cycle: 1,
         border: None,
@@ -842,6 +850,7 @@ fn demo(mode: ColorMode) -> Result<(), String> {
             mode,
             target_width: 0,
             margin_y: 0,
+            margin_x: 0,
             reverse: false,
             cycle: 1,
             border: Border::parse(border)?,
