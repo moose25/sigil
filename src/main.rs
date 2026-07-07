@@ -486,6 +486,10 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         let html = sigil::render::to_html(&banner, &opts, background);
         return write_output(s.out.as_deref(), &html);
     }
+    if format == Format::Json {
+        let json = sigil::render::to_json(&banner, &opts);
+        return write_output(s.out.as_deref(), &json);
+    }
     if format == Format::Png {
         let bytes = sigil::render::to_png(&banner, &opts, background, s.scale)?;
         return write_bytes(s.out.as_deref(), &bytes);
