@@ -101,6 +101,7 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 | `-l, --lines` | Stack each input line/argument as its own banner | — |
 | `--random` | Random font + gradient for anything unset | — |
 | `--seed <n>` | Seed for `--random` (reproducible) | — |
+| `--copy` | Also copy the output to the system clipboard | — |
 | `--no-color` | Disable color | — |
 
 ### Gradients
