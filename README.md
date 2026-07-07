@@ -6,10 +6,25 @@
 
 > Status: early v0. A single static binary with no runtime dependencies.
 
+## Install
+
+```sh
+# From source (this repo)
+cargo install --path .
+
+# Directly from git
+cargo install --git https://github.com/moose25/sigil
+
+# Prebuilt binaries: grab the archive for your platform from the Releases page,
+# then move `sigil` onto your PATH.
+```
+
+Once published to crates.io: `cargo install sigil`.
+
 ## Quick start
 
 ```sh
-cargo run -- "My Project" --gradient sunset
+sigil "My Project" --gradient sunset
 ```
 
 ## Usage
@@ -106,7 +121,7 @@ sigil man              > sigil.1               # roff man page
 
 ## Roadmap
 
-Tracked in [issues](../../issues): unicode-width correctness, packaging/releases, and a demo gif.
+Tracked in [issues](../../issues): unicode-width correctness and a demo gif.
 
 ## License
 
