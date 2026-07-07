@@ -1,6 +1,10 @@
+use std::io::IsTerminal;
+use std::path::Path;
+
 use clap::{Parser, Subcommand};
 
 use sigil::color::{ColorMode, Rgb};
+use sigil::export::{self, Format};
 use sigil::fonts;
 use sigil::gradient::{Direction, Gradient};
 use sigil::render::{paint, Align, Banner, RenderOptions};
@@ -46,6 +50,14 @@ struct Cli {
     #[arg(long)]
     no_color: bool,
 
+    /// Output format: term | ansi | raw | rust | go | python | shell.
+    #[arg(short = 'F', long, default_value = "term")]
+    format: String,
+
+    /// Write output to a file instead of stdout.
+    #[arg(short = 'o', long, value_name = "FILE")]
+    out: Option<std::path::PathBuf>,
+
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -81,29 +93,76 @@ fn run(cli: Cli) -> Result<(), String> {
                 .text
                 .as_deref()
                 .ok_or("no text given. Try: sigil \"My Project\"  (or `sigil --help`)")?;
-            render_banner(&cli, text, mode)
+            render_banner(&cli, text)
         }
     }
 }
 
-fn render_banner(cli: &Cli, text: &str, mode: ColorMode) -> Result<(), String> {
+fn render_banner(cli: &Cli, text: &str) -> Result<(), String> {
+    let format = Format::parse(&cli.format)?;
     let font = fonts::load(&cli.font)?;
     let gradient = resolve_gradient(cli)?;
     let direction = Direction::parse(&cli.direction)?;
     let align = Align::parse(&cli.align)?;
-    let target_width = cli.width.unwrap_or_else(term_width);
-
     let banner = Banner::layout(&font, text)?;
+    let mode = color_mode(cli, format);
+
+    // Only direct terminal output gets terminal-width indentation and margins;
+    // snippets and raw/ansi output stay tight to the banner's own width.
+    let (target_width, margin_y) = if format == Format::Term {
+        (cli.width.unwrap_or_else(term_width), cli.margin)
+    } else {
+        (banner.width, 0)
+    };
+
     let opts = RenderOptions {
         gradient,
         direction,
         align,
         mode,
         target_width,
-        margin_y: cli.margin,
+        margin_y,
     };
-    print!("{}", paint(&banner, &opts));
-    Ok(())
+    let painted = paint(&banner, &opts);
+    let output = export::wrap(format, &painted);
+    write_output(cli.out.as_deref(), &output)
+}
+
+/// Decide the color mode for a render, given the format and where output goes.
+///
+/// `--no-color`/`NO_COLOR` always win. Snippet and `ansi` formats bake color
+/// in. Plain terminal output uses color only when writing to an actual TTY.
+fn color_mode(cli: &Cli, format: Format) -> ColorMode {
+    if cli.no_color || std::env::var_os("NO_COLOR").is_some() {
+        return ColorMode::None;
+    }
+    if format == Format::Raw {
+        return ColorMode::None;
+    }
+    if format.forces_color() {
+        return ColorMode::supported();
+    }
+    // Format::Term: color only on a real terminal (not piped, not a file).
+    if cli.out.is_none() && std::io::stdout().is_terminal() {
+        ColorMode::supported()
+    } else {
+        ColorMode::None
+    }
+}
+
+/// Write to a file when `-o` is given, otherwise to stdout.
+fn write_output(path: Option<&Path>, content: &str) -> Result<(), String> {
+    match path {
+        Some(p) => {
+            std::fs::write(p, content).map_err(|e| format!("cannot write {}: {e}", p.display()))?;
+            eprintln!("wrote {}", p.display());
+            Ok(())
+        }
+        None => {
+            print!("{content}");
+            Ok(())
+        }
+    }
 }
 
 /// Build the gradient from --colors (if given) or the named --gradient preset.

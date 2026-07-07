@@ -5,8 +5,10 @@
 //! - [`gradient`]: named presets and Oklab sampling
 //! - [`fonts`]: bundled FIGlet fonts, embedded in the binary
 //! - [`render`]: FIGlet layout and painting glyphs with a gradient
+//! - [`export`]: output formats (terminal, raw, and code snippets)
 
 pub mod color;
+pub mod export;
 pub mod fonts;
 pub mod gradient;
 pub mod render;

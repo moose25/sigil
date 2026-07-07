@@ -141,6 +141,13 @@ impl ColorMode {
         if std::env::var_os("NO_COLOR").is_some() {
             return ColorMode::None;
         }
+        ColorMode::supported()
+    }
+
+    /// The richest color mode the terminal advertises via `COLORTERM`,
+    /// ignoring `NO_COLOR` and TTY state. Used when a caller wants to bake
+    /// color in regardless (e.g. exporting a colored snippet).
+    pub fn supported() -> ColorMode {
         match std::env::var("COLORTERM") {
             Ok(v) if v.contains("truecolor") || v.contains("24bit") => ColorMode::True,
             _ => ColorMode::Ansi256,
