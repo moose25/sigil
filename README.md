@@ -82,6 +82,7 @@ sigil "Neo" --theme cyberpunk                   # a curated font+gradient+border
 sigil gradients                               # preview all presets
 sigil fonts                                   # preview all fonts
 sigil "plain" --no-color                      # respects NO_COLOR too
+sigil "Docs" -F markdown                       # a fenced code block for READMEs
 ```
 
 ### Options

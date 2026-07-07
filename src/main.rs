@@ -688,7 +688,7 @@ fn color_mode(s: &Settings, format: Format) -> ColorMode {
     if s.no_color || std::env::var_os("NO_COLOR").is_some() {
         return ColorMode::None;
     }
-    if format == Format::Raw {
+    if format == Format::Raw || format == Format::Markdown {
         return ColorMode::None;
     }
     if format.forces_color() {
