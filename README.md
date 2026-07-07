@@ -74,6 +74,7 @@ sigil "Launching" -g fire --animate sweep     # animated shimmer (TTY only)
 sigil "Ready" --animate type --fps 60         # typewriter reveal
 sigil "Angle" -g rainbow --angle 60 --cycle 2 # tilted, repeating palette
 sigil "Boxed" -g ocean --border round         # frame it in a box
+sigil "Deploy" --icon "🚀" -g fire            # a small icon beside the wordmark
 sigil "Surprise" --random                      # random font + gradient (--seed N to repeat)
 sigil --lines "deploy" "prod"                   # stack multiple banners in one frame
 sigil "Neo" --theme cyberpunk                   # a curated font+gradient+border+bg bundle
@@ -106,6 +107,7 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 | `--outline-color <hex>` | Outline color | near-black |
 | `-a, --align <align>` | `left` \| `center` \| `right` | `left` |
 | `-f, --font <name>` | Font (see `sigil fonts`) | `standard` |
+| `--icon <glyph>` | Prefix a small icon/emoji to the left of the banner | — |
 | `-w, --width <cols>` | Target width for alignment | terminal width |
 | `--min-width <cols>` | Pad the banner box out to at least N columns (centered) | — |
 | `-m, --margin <n>` | Blank lines above/below | `0` |

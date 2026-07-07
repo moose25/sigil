@@ -180,6 +180,28 @@ impl Banner {
         Banner { lines, width }
     }
 
+    /// Prepend a small icon (an emoji or Nerd Font glyph) to the left of the
+    /// banner, vertically centered, with `gap` blank columns between it and the
+    /// text. The glyph renders at the terminal's normal cell size — an icon
+    /// beside a wordmark. A zero-width icon is ignored.
+    pub fn with_icon(mut self, icon: &str, gap: usize) -> Banner {
+        let iw = display_width(icon);
+        if iw == 0 {
+            return self;
+        }
+        let mid = self.lines.len() / 2;
+        let blank = " ".repeat(iw + gap);
+        for (i, line) in self.lines.iter_mut().enumerate() {
+            if i == mid {
+                *line = format!("{icon}{}{line}", " ".repeat(gap));
+            } else {
+                *line = format!("{blank}{line}");
+            }
+        }
+        self.width += iw + gap;
+        self
+    }
+
     pub fn height(&self) -> usize {
         self.lines.len()
     }
@@ -787,6 +809,18 @@ mod tests {
             outline: None,
             title: None,
         }
+    }
+
+    #[test]
+    fn icon_prefixes_and_widens() {
+        let b = Banner::layout(&font(), "Hi").unwrap();
+        let w0 = b.width;
+        let iced = b.with_icon("*", 2);
+        assert_eq!(iced.width, w0 + 1 + 2); // icon width 1 + gap 2
+                                            // The middle row carries the icon; every row grew to the new width.
+        let mid = &iced.lines[iced.lines.len() / 2];
+        assert!(mid.starts_with('*'));
+        assert!(iced.lines.iter().all(|l| display_width(l) == iced.width));
     }
 
     #[test]

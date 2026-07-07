@@ -110,6 +110,10 @@ struct Cli {
     #[arg(long, value_name = "FILE")]
     art: Option<std::path::PathBuf>,
 
+    /// Prefix a small icon/emoji to the left of the banner, e.g. --icon "🚀".
+    #[arg(long, value_name = "GLYPH")]
+    icon: Option<String>,
+
     /// Apply a named theme bundle (see `sigil themes`).
     #[arg(short = 't', long)]
     theme: Option<String>,
@@ -285,6 +289,7 @@ struct Settings {
     lines: bool,
     copy: bool,
     art: Option<std::path::PathBuf>,
+    icon: Option<String>,
     color_by: String,
     interpolate: String,
     title: Option<String>,
@@ -373,6 +378,7 @@ impl Settings {
             art: cli.art.clone(),
             color_by: pick(&cli.color_by, None, cfg.color_by, "banner"),
             interpolate: pick(&cli.interpolate, None, cfg.interpolate, "oklab"),
+            icon: cli.icon.clone().or(cfg.icon),
             title: cli.title.clone().or(cfg.title),
             shadow: cli.shadow || theme.shadow.unwrap_or(false) || cfg.shadow.unwrap_or(false),
             shadow_color: cli
@@ -446,6 +452,11 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
     } else {
         Banner::layout(&font, text)?
     };
+    if let Some(icon) = &s.icon {
+        if !icon.is_empty() {
+            banner = banner.with_icon(icon, 2);
+        }
+    }
     let mode = color_mode(s, format);
     let anim = Anim::parse(&s.animate)?;
 
