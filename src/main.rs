@@ -200,6 +200,19 @@ enum Command {
     },
     /// Print a man page (roff) to stdout.
     Man,
+    /// Inspect config: file locations (`path`) or effective values (`show`).
+    Config {
+        #[command(subcommand)]
+        action: ConfigAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum ConfigAction {
+    /// Print the config files sigil reads, and whether each exists.
+    Path,
+    /// Print the effective settings after merging the config files.
+    Show,
 }
 
 fn main() {
@@ -232,6 +245,13 @@ fn run(cli: Cli) -> Result<(), String> {
             Ok(())
         }
         Some(Command::Man) => print_man(),
+        Some(Command::Config { action }) => match action {
+            ConfigAction::Path => {
+                show_config_paths();
+                Ok(())
+            }
+            ConfigAction::Show => show_config(),
+        },
         None => {
             // With --art the content comes from a file/stdin, not the positional text.
             let text = if cli.art.is_some() {
@@ -836,6 +856,92 @@ fn init_config(force: bool, print: bool) -> Result<(), String> {
         .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
     eprintln!("wrote {}", path.display());
     Ok(())
+}
+
+/// Print the config files sigil reads (user then project), and whether each
+/// currently exists on disk.
+fn show_config_paths() {
+    let mark = |p: &Path| if p.exists() { "exists" } else { "not found" };
+    println!("sigil reads these config files (later ones win; CLI flags win over all):\n");
+    match sigil::config::user_config_path() {
+        Some(p) => println!("  user     {}  ({})", p.display(), mark(&p)),
+        None => println!("  user     <unavailable: set HOME or XDG_CONFIG_HOME>"),
+    }
+    let project = Path::new(".sigil.toml");
+    println!("  project  {}  ({})", project.display(), mark(project));
+    println!("\nCreate one with `sigil init` (or `sigil init --print` to preview).");
+}
+
+/// Print the effective settings after merging the config files (before any
+/// CLI flags, which override at run time).
+fn show_config() -> Result<(), String> {
+    let cfg = Config::load()?;
+    // Print each field that a config file actually set. Works for any
+    // `Option<T: Display>` regardless of the inner type.
+    let mut shown = 0usize;
+    macro_rules! field {
+        ($label:literal, $val:expr) => {
+            if let Some(v) = &$val {
+                println!("  {:<13} {}", $label, v);
+                shown += 1;
+            }
+        };
+    }
+    println!("Effective config (merged from the files above; CLI flags still override):\n");
+    field!("gradient", cfg.gradient);
+    field!("colors", cfg.colors);
+    field!("font", cfg.font);
+    field!("direction", cfg.direction);
+    field!("align", cfg.align);
+    field!("color_by", cfg.color_by);
+    field!("interpolate", cfg.interpolate);
+    field!("angle", cfg.angle);
+    field!("reverse", cfg.reverse);
+    field!("cycle", cfg.cycle);
+    field!("border", cfg.border);
+    field!("padding", cfg.padding);
+    field!("pad_x", cfg.pad_x);
+    field!("pad_y", cfg.pad_y);
+    field!("border_color", cfg.border_color);
+    field!("background", cfg.background);
+    field!("shadow", cfg.shadow);
+    field!("shadow_color", cfg.shadow_color);
+    field!("outline", cfg.outline);
+    field!("outline_color", cfg.outline_color);
+    field!("scale", cfg.scale);
+    field!("title", cfg.title);
+    field!("margin", cfg.margin);
+    field!("margin_x", cfg.margin_x);
+    field!("min_width", cfg.min_width);
+    field!("width", cfg.width);
+    field!("animate", cfg.animate);
+    field!("fps", cfg.fps);
+    field!("format", cfg.format);
+    if !cfg.gradients.is_empty() {
+        let mut names: Vec<&String> = cfg.gradients.keys().collect();
+        names.sort();
+        println!("  {:<13} {}", "gradients", join_names(&names));
+        shown += 1;
+    }
+    if !cfg.themes.is_empty() {
+        let mut names: Vec<&String> = cfg.themes.keys().collect();
+        names.sort();
+        println!("  {:<13} {}", "themes", join_names(&names));
+        shown += 1;
+    }
+    if shown == 0 {
+        println!("  (nothing set — sigil is using its built-in defaults)");
+    }
+    Ok(())
+}
+
+/// Join a list of names for display, comma-separated.
+fn join_names(names: &[&String]) -> String {
+    names
+        .iter()
+        .map(|s| s.as_str())
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// Render a short showcase of fonts, gradients, and effects.

@@ -88,3 +88,22 @@ fn version_flag_works() {
     assert!(out.status.success());
     assert!(String::from_utf8(out.stdout).unwrap().contains("sigil"));
 }
+
+#[test]
+fn config_path_lists_both_files() {
+    let out = run(&["config", "path"]);
+    assert!(out.status.success());
+    let s = String::from_utf8(out.stdout).unwrap();
+    assert!(s.contains("user") && s.contains("project"));
+    assert!(s.contains(".sigil.toml"));
+}
+
+#[test]
+fn config_show_runs() {
+    // With no config files it still succeeds and prints the header.
+    let out = run(&["config", "show"]);
+    assert!(out.status.success());
+    assert!(String::from_utf8(out.stdout)
+        .unwrap()
+        .contains("Effective config"));
+}
