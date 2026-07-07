@@ -266,6 +266,89 @@ pub fn paint(banner: &Banner, opts: &RenderOptions) -> String {
     out
 }
 
+/// Render the banner as a standalone SVG (monospace grid with colored spans),
+/// suitable for embedding in a README or docs. `background` fills the canvas;
+/// when `None` a dark backdrop is used so light gradients stay readable.
+pub fn to_svg(banner: &Banner, opts: &RenderOptions, background: Option<Rgb>) -> String {
+    let grid = compose(banner, opts.border, opts.padding);
+    let font_size = 24.0_f32;
+    let cell_w = font_size * 0.6; // monospace advance width
+    let line_h = font_size * 1.2;
+    let w = grid.width as f32 * cell_w;
+    let h = grid.height as f32 * line_h;
+    let bg = background.unwrap_or(Rgb::new(13, 17, 23));
+
+    let mut s = String::new();
+    s.push_str(&format!(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w:.0}\" height=\"{h:.0}\" \
+         viewBox=\"0 0 {w:.0} {h:.0}\">\n"
+    ));
+    s.push_str(&format!(
+        "<rect width=\"100%\" height=\"100%\" rx=\"8\" fill=\"{}\"/>\n",
+        hex(bg)
+    ));
+    s.push_str(&format!(
+        "<text xml:space=\"preserve\" font-family=\"ui-monospace,SFMono-Regular,Menlo,Consolas,monospace\" \
+         font-size=\"{font_size:.0}\" font-weight=\"bold\">\n"
+    ));
+
+    for row in 0..grid.height {
+        let y = (row as f32 + 0.8) * line_h;
+        s.push_str(&format!("<tspan x=\"0\" y=\"{y:.1}\">"));
+        // Group consecutive cells sharing a fill; spaces extend the current run.
+        let mut run = String::new();
+        let mut fill: Option<Rgb> = None;
+        for col in 0..grid.width {
+            let ch = grid.chars[row][col];
+            if ch == CONT {
+                continue;
+            }
+            let cell_fill = if ch == ' ' {
+                fill // keep current color under spaces (invisible anyway)
+            } else {
+                Some(cell_color(&grid, opts, row, col, 0.0))
+            };
+            if ch != ' ' && cell_fill != fill && !run.is_empty() {
+                push_span(&mut s, &run, fill);
+                run.clear();
+            }
+            if ch != ' ' {
+                fill = cell_fill;
+            }
+            run.push(ch);
+        }
+        push_span(&mut s, &run, fill);
+        s.push_str("</tspan>\n");
+    }
+    s.push_str("</text>\n</svg>\n");
+    s
+}
+
+/// Emit a `<tspan>` for a run of text with an optional fill color.
+fn push_span(out: &mut String, text: &str, fill: Option<Rgb>) {
+    if text.is_empty() {
+        return;
+    }
+    match fill {
+        Some(c) => out.push_str(&format!(
+            "<tspan fill=\"{}\">{}</tspan>",
+            hex(c),
+            xml_escape(text)
+        )),
+        None => out.push_str(&xml_escape(text)),
+    }
+}
+
+fn hex(c: Rgb) -> String {
+    format!("#{:02x}{:02x}{:02x}", c.r, c.g, c.b)
+}
+
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -288,6 +371,26 @@ mod tests {
             padding: (0, 0),
             border_color: None,
         }
+    }
+
+    #[test]
+    fn svg_is_well_formed() {
+        let b = Banner::layout(&font(), "Hi").unwrap();
+        let svg = to_svg(&b, &base_opts(ColorMode::True), None);
+        assert!(svg.starts_with("<svg"));
+        assert!(svg.trim_end().ends_with("</svg>"));
+        assert!(svg.contains("fill=\"#"));
+        assert!(svg.contains("<rect"));
+        // Opening and closing tspans balance.
+        assert_eq!(
+            svg.matches("<tspan").count(),
+            svg.matches("</tspan>").count()
+        );
+    }
+
+    #[test]
+    fn xml_special_chars_escaped() {
+        assert_eq!(xml_escape("a<b>&c"), "a&lt;b&gt;&amp;c");
     }
 
     #[test]

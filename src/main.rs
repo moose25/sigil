@@ -301,6 +301,12 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         border_color,
     };
 
+    // SVG is rendered directly from the grid, not from painted ANSI.
+    if format == Format::Svg {
+        let svg = sigil::render::to_svg(&banner, &opts, None);
+        return write_output(s.out.as_deref(), &svg);
+    }
+
     // Animate only for live terminal output; snippets/files/pipes render static.
     if anim.is_animated()
         && format == Format::Term
