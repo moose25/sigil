@@ -163,6 +163,8 @@ pub struct RenderOptions {
     pub padding: (usize, usize),
     /// Solid color for the frame; when `None`, the frame shares the gradient.
     pub border_color: Option<Rgb>,
+    /// Solid background fill behind the whole box; `None` leaves it bare.
+    pub background: Option<Rgb>,
 }
 
 /// The banner, padding, and any frame composited into a character grid.
@@ -262,8 +264,18 @@ pub fn paint(banner: &Banner, opts: &RenderOptions) -> String {
     for _ in 0..opts.margin_y {
         out.push('\n');
     }
+    // Background is applied per row (indent stays outside the fill) and cleared
+    // by the reset at each line's end.
+    let bg = opts
+        .background
+        .filter(|_| opts.mode != ColorMode::None)
+        .map(|c| opts.mode.bg(c));
+
     for row in 0..grid.height {
         out.push_str(&pad);
+        if let Some(bg) = &bg {
+            out.push_str(bg);
+        }
         let mut last: Option<Rgb> = None;
         for col in 0..grid.width {
             let ch = grid.chars[row][col];
@@ -394,6 +406,7 @@ mod tests {
             border: None,
             padding: (0, 0),
             border_color: None,
+            background: None,
         }
     }
 

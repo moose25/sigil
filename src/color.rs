@@ -163,6 +163,15 @@ impl ColorMode {
         }
     }
 
+    /// ANSI SGR sequence that sets the background to `c` for this mode.
+    pub fn bg(self, c: Rgb) -> String {
+        match self {
+            ColorMode::True => format!("\x1b[48;2;{};{};{}m", c.r, c.g, c.b),
+            ColorMode::Ansi256 => format!("\x1b[48;5;{}m", rgb_to_ansi256(c)),
+            ColorMode::None => String::new(),
+        }
+    }
+
     pub fn reset(self) -> &'static str {
         match self {
             ColorMode::None => "",
