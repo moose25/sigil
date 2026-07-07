@@ -46,6 +46,36 @@ const TABLE: &[Bundled] = &[
         description: "compact, space-saving",
         flf: Some(include_str!("Small.flf")),
     },
+    Bundled {
+        canonical: "doom",
+        aliases: &[],
+        description: "chunky, video-game logo vibes",
+        flf: Some(include_str!("Doom.flf")),
+    },
+    Bundled {
+        canonical: "bloody",
+        aliases: &["blood"],
+        description: "dripping, horror-movie letters",
+        flf: Some(include_str!("Bloody.flf")),
+    },
+    Bundled {
+        canonical: "3d",
+        aliases: &["ascii3d", "3d-ascii"],
+        description: "extruded 3D lettering",
+        flf: Some(include_str!("3D-ASCII.flf")),
+    },
+    Bundled {
+        canonical: "ansiregular",
+        aliases: &["ansi", "regular"],
+        description: "solid block capitals",
+        flf: Some(include_str!("ANSI_Regular.flf")),
+    },
+    Bundled {
+        canonical: "ghost",
+        aliases: &[],
+        description: "soft, rounded outlines",
+        flf: Some(include_str!("Ghost.flf")),
+    },
 ];
 
 /// A listable font: canonical name and one-line description.
