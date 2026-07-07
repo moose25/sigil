@@ -67,6 +67,7 @@ sigil "loop"   -g rainbow --animate scroll
 ```sh
 sigil "Hello" --gradient ocean --direction diagonal --align center
 sigil "Ship it" --colors "#ff5f6d,#ffc371"   # custom gradient stops
+sigil "Brandy" --from "#ff5f6d"              # a gradient from one brand color
 sigil "Deploy" --font ansishadow             # pick a font
 echo "From stdin" | sigil                     # or pipe the text in
 sigil --art cat.txt -g rainbow                # colorize existing ASCII art
@@ -88,6 +89,7 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 | ---- | ----------- | ------- |
 | `-g, --gradient <name>` | Named preset (see `sigil gradients`) | `ocean` |
 | `-c, --colors <hex,...>` | Custom gradient stops, e.g. `#ff5f6d,#ffc371` | — |
+| `--from <hex>` | Derive a gradient from one brand color (overridden by `--colors`) | — |
 | `-d, --direction <dir>` | `horizontal` \| `vertical` \| `diagonal` | `horizontal` |
 | `--angle <deg>` | Sweep angle in degrees (overrides `--direction`) | — |
 | `--color-by <mode>` | `banner` \| `line` \| `char` (per-line / per-glyph coloring) | `banner` |
