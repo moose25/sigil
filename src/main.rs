@@ -226,17 +226,6 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
     let mode = color_mode(s, format);
     let anim = Anim::parse(&s.animate)?;
 
-    // Animate only for live terminal output; snippets/files/pipes render static.
-    if anim.is_animated()
-        && format == Format::Term
-        && s.out.is_none()
-        && std::io::stdout().is_terminal()
-    {
-        let mut out = std::io::stdout().lock();
-        return animate::play(&mut out, &banner, &gradient, mode, anim, s.fps)
-            .map_err(|e| format!("animation error: {e}"));
-    }
-
     let border = Border::parse(&s.border)?;
     // Give a framed banner a little breathing room by default.
     let padding = if border.is_some() {
@@ -274,6 +263,18 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         padding,
         border_color,
     };
+
+    // Animate only for live terminal output; snippets/files/pipes render static.
+    if anim.is_animated()
+        && format == Format::Term
+        && s.out.is_none()
+        && std::io::stdout().is_terminal()
+    {
+        let mut out = std::io::stdout().lock();
+        return animate::play(&mut out, &banner, &opts, anim, s.fps)
+            .map_err(|e| format!("animation error: {e}"));
+    }
+
     let painted = paint(&banner, &opts);
     let output = export::wrap(format, &painted);
     write_output(s.out.as_deref(), &output)

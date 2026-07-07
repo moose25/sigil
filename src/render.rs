@@ -130,35 +130,42 @@ pub struct RenderOptions {
     pub border_color: Option<Rgb>,
 }
 
-/// Paint `banner` into a printable string with ANSI color escapes.
+/// The banner, padding, and any frame composited into a character grid.
 ///
-/// The banner (with any padding and frame) is composited into a character
-/// grid, then every non-space cell is colored by its position in that grid —
-/// so the gradient flows across the whole framed box, frame included.
-pub fn paint(banner: &Banner, opts: &RenderOptions) -> String {
-    let (px, py) = opts.padding;
-    let edge = if opts.border.is_some() { 1 } else { 0 };
-    let total_w = banner.width + 2 * px + 2 * edge;
-    let total_h = banner.height() + 2 * py + 2 * edge;
+/// `chars` holds the glyph at each cell (space where empty); `is_frame` marks
+/// cells that belong to the border. Coloring works over grid coordinates, so
+/// the gradient flows across the whole framed box.
+pub struct Grid {
+    pub chars: Vec<Vec<char>>,
+    pub is_frame: Vec<Vec<bool>>,
+    pub width: usize,
+    pub height: usize,
+}
+
+/// Composite a banner (with padding and optional frame) into a [`Grid`].
+pub fn compose(banner: &Banner, border: Option<Border>, padding: (usize, usize)) -> Grid {
+    let (px, py) = padding;
+    let edge = if border.is_some() { 1 } else { 0 };
+    let width = banner.width + 2 * px + 2 * edge;
+    let height = banner.height() + 2 * py + 2 * edge;
     let (ox, oy) = (edge + px, edge + py);
 
-    // Composite the banner glyphs (and frame) into a grid of chars.
-    let mut grid = vec![vec![' '; total_w]; total_h];
-    let mut is_frame = vec![vec![false; total_w]; total_h];
+    let mut chars = vec![vec![' '; width]; height];
+    let mut is_frame = vec![vec![false; width]; height];
     for (r, line) in banner.lines.iter().enumerate() {
         for (c, ch) in line.chars().enumerate() {
-            grid[oy + r][ox + c] = ch;
+            chars[oy + r][ox + c] = ch;
         }
     }
-    if let Some(b) = opts.border {
-        let (top, bot, left, right) = (0, total_h - 1, 0, total_w - 1);
-        for col in 0..total_w {
-            grid[top][col] = b.h;
-            grid[bot][col] = b.h;
+    if let Some(b) = border {
+        let (top, bot, left, right) = (0, height - 1, 0, width - 1);
+        for col in 0..width {
+            chars[top][col] = b.h;
+            chars[bot][col] = b.h;
             is_frame[top][col] = true;
             is_frame[bot][col] = true;
         }
-        for row in grid.iter_mut() {
+        for row in chars.iter_mut() {
             row[left] = b.v;
             row[right] = b.v;
         }
@@ -166,13 +173,38 @@ pub fn paint(banner: &Banner, opts: &RenderOptions) -> String {
             r[left] = true;
             r[right] = true;
         }
-        grid[top][left] = b.tl;
-        grid[top][right] = b.tr;
-        grid[bot][left] = b.bl;
-        grid[bot][right] = b.br;
+        chars[top][left] = b.tl;
+        chars[top][right] = b.tr;
+        chars[bot][left] = b.bl;
+        chars[bot][right] = b.br;
     }
+    Grid {
+        chars,
+        is_frame,
+        width,
+        height,
+    }
+}
 
-    let slack = opts.target_width.saturating_sub(total_w);
+/// The color of the non-space cell at (row, col), honoring a solid frame color,
+/// the gradient direction, reverse/cycle, and an animation `phase` shift.
+pub fn cell_color(grid: &Grid, opts: &RenderOptions, row: usize, col: usize, phase: f32) -> Rgb {
+    if let Some(c) = opts.border_color {
+        if grid.is_frame[row][col] {
+            return c;
+        }
+    }
+    let base = opts.direction.t(row, col, grid.height, grid.width);
+    let t = crate::gradient::adjust_t(base, opts.reverse, opts.cycle);
+    let t = (t - phase).rem_euclid(1.0);
+    opts.gradient.sample(t)
+}
+
+/// Paint `banner` into a printable string with ANSI color escapes.
+pub fn paint(banner: &Banner, opts: &RenderOptions) -> String {
+    let grid = compose(banner, opts.border, opts.padding);
+
+    let slack = opts.target_width.saturating_sub(grid.width);
     let indent = match opts.align {
         Align::Left => 0,
         Align::Center => slack / 2,
@@ -184,23 +216,16 @@ pub fn paint(banner: &Banner, opts: &RenderOptions) -> String {
     for _ in 0..opts.margin_y {
         out.push('\n');
     }
-    for row in 0..total_h {
+    for row in 0..grid.height {
         out.push_str(&pad);
         let mut last: Option<Rgb> = None;
-        for col in 0..total_w {
-            let ch = grid[row][col];
+        for col in 0..grid.width {
+            let ch = grid.chars[row][col];
             if ch == ' ' {
                 out.push(' ');
                 continue;
             }
-            let color = match opts.border_color {
-                Some(c) if is_frame[row][col] => c,
-                _ => {
-                    let t = opts.direction.t(row, col, total_h, total_w);
-                    let t = crate::gradient::adjust_t(t, opts.reverse, opts.cycle);
-                    opts.gradient.sample(t)
-                }
-            };
+            let color = cell_color(&grid, opts, row, col, 0.0);
             if opts.mode != ColorMode::None && last != Some(color) {
                 out.push_str(&opts.mode.fg(color));
                 last = Some(color);
