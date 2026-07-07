@@ -112,12 +112,40 @@ impl Config {
     }
 }
 
-fn user_config_path() -> Option<PathBuf> {
+/// Path to the user config file (`$XDG_CONFIG_HOME/sigil/config.toml` or
+/// `~/.config/sigil/config.toml`), if a home/config location is known.
+pub fn user_config_path() -> Option<PathBuf> {
     let base = std::env::var_os("XDG_CONFIG_HOME")
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))?;
     Some(base.join("sigil").join("config.toml"))
 }
+
+/// A commented starter config, written by `sigil init`.
+pub const STARTER: &str = "\
+# sigil config — https://github.com/moose25/sigil
+# Every option is optional; CLI flags override these. Uncomment to use.
+
+# gradient = \"vaporwave\"     # a preset, or define one under [gradients]
+# font     = \"ansishadow\"
+# align    = \"center\"
+# border   = \"round\"
+# padding  = 1
+# background   = \"#0d1117\"
+# color_by = \"banner\"        # banner | line | char
+# shadow   = false
+# outline  = false
+
+# Your own named gradients — use with `-g brand`:
+# [gradients]
+# brand = [\"#0f2027\", \"#203a43\", \"#2c5364\"]
+
+# Your own themes — use with `--theme mine`:
+# [themes.mine]
+# font = \"slant\"
+# gradient = \"gold\"
+# border = \"double\"
+";
 
 #[cfg(test)]
 mod tests {
@@ -136,6 +164,13 @@ mod tests {
     #[test]
     fn rejects_unknown_fields() {
         assert!(toml::from_str::<Config>("wobble = true\n").is_err());
+    }
+
+    #[test]
+    fn starter_config_is_valid() {
+        // The starter is fully commented, so it parses to an empty config.
+        let cfg: Config = toml::from_str(STARTER).expect("starter parses");
+        assert!(cfg.gradient.is_none() && cfg.font.is_none());
     }
 
     #[test]
