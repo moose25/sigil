@@ -9,7 +9,7 @@ use sigil::config::Config;
 use sigil::export::{self, Format};
 use sigil::fonts;
 use sigil::gradient::{Direction, Gradient};
-use sigil::render::{paint, Align, Banner, Border, RenderOptions};
+use sigil::render::{paint, Align, Banner, Border, ColorBy, RenderOptions};
 use sigil::themes::{self, Theme};
 
 /// Give your CLI a face — modern gradient ASCII banners.
@@ -64,6 +64,10 @@ struct Cli {
     /// Alignment within the terminal width: left | center | right. [default: left]
     #[arg(short, long)]
     align: Option<String>,
+
+    /// How to map the gradient: banner | line | char. [default: banner]
+    #[arg(long)]
+    color_by: Option<String>,
 
     /// Font name (see `sigil fonts`). [default: standard]
     #[arg(short, long)]
@@ -197,6 +201,7 @@ struct Settings {
     fps: u32,
     no_color: bool,
     lines: bool,
+    color_by: String,
     user_gradients: std::collections::HashMap<String, Vec<String>>,
 }
 
@@ -269,6 +274,7 @@ impl Settings {
             fps: cli.fps.or(cfg.fps).unwrap_or(30),
             no_color: cli.no_color,
             lines: cli.lines,
+            color_by: pick(&cli.color_by, None, cfg.color_by, "banner"),
             user_gradients: cfg.gradients,
         })
     }
@@ -346,6 +352,7 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         Some(hex) => Some(Rgb::parse(hex)?),
         None => None,
     };
+    let color_by = ColorBy::parse(&s.color_by)?;
 
     // Framed width includes the border and padding.
     let framed_w = banner.width + 2 * padding.0 + if border.is_some() { 2 } else { 0 };
@@ -370,6 +377,7 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         padding,
         border_color,
         background,
+        color_by,
     };
 
     // SVG/HTML are rendered directly from the grid, not from painted ANSI.
@@ -552,6 +560,7 @@ fn preview_font(
         padding: (0, 0),
         border_color: None,
         background: None,
+        color_by: ColorBy::Banner,
     };
     print!("{}", paint(&banner, &opts));
     Ok(())

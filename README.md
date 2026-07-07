@@ -76,6 +76,7 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 | `-c, --colors <hex,...>` | Custom gradient stops, e.g. `#ff5f6d,#ffc371` | — |
 | `-d, --direction <dir>` | `horizontal` \| `vertical` \| `diagonal` | `horizontal` |
 | `--angle <deg>` | Sweep angle in degrees (overrides `--direction`) | — |
+| `--color-by <mode>` | `banner` \| `line` \| `char` (per-line / per-glyph coloring) | `banner` |
 | `--reverse` | Flip the gradient direction | — |
 | `--cycle <n>` | Repeat the palette N times across the banner | `1` |
 | `-b, --border <style>` | `none` \| `round` \| `single` \| `double` \| `heavy` \| `ascii` | `none` |

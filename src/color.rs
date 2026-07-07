@@ -5,7 +5,7 @@
 //! uniform, so a red->blue sweep stays vivid the whole way across.
 
 /// An 8-bit-per-channel sRGB color.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Rgb {
     pub r: u8,
     pub g: u8,
