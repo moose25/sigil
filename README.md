@@ -96,6 +96,7 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 | `--cycle <n>` | Repeat the palette N times across the banner | `1` |
 | `-b, --border <style>` | `none` \| `round` \| `single` \| `double` \| `heavy` \| `ascii` | `none` |
 | `-p, --padding <n>` | Interior padding inside the frame | `1` (with border) |
+| `--pad-x <n>` / `--pad-y <n>` | Horizontal/vertical padding (override `--padding` per axis) | — |
 | `--title <text>` | Caption embedded in the top border | — |
 | `--border-color <hex>` | Solid frame color (default: share the gradient) | — |
 | `--background <hex>` | Solid background fill behind the banner (alias `--bg`) | — |
