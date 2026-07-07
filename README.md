@@ -83,6 +83,8 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 | `-p, --padding <n>` | Interior padding inside the frame | `1` (with border) |
 | `--border-color <hex>` | Solid frame color (default: share the gradient) | — |
 | `--background <hex>` | Solid background fill behind the banner (alias `--bg`) | — |
+| `--shadow` | Draw a drop shadow behind the glyphs | — |
+| `--shadow-color <hex>` | Shadow color | dark gray |
 | `-a, --align <align>` | `left` \| `center` \| `right` | `left` |
 | `-f, --font <name>` | Font (see `sigil fonts`) | `standard` |
 | `-w, --width <cols>` | Target width for alignment | terminal width |
