@@ -99,6 +99,24 @@ fn fit_respects_the_column_budget() {
 }
 
 #[test]
+fn gallery_writes_html_with_svgs() {
+    let out = run(&["gallery", "Acme"]);
+    assert!(out.status.success());
+    let s = String::from_utf8(out.stdout).unwrap();
+    assert!(s.contains("<!DOCTYPE html>"));
+    assert!(s.contains("sigil gallery"));
+    assert!(s.matches("<svg").count() > 20); // fonts + gradients + themes
+}
+
+#[test]
+fn mark_outputs_svg() {
+    let out = run(&["mark", "acme"]);
+    assert!(out.status.success());
+    let s = String::from_utf8(out.stdout).unwrap();
+    assert!(s.trim_start().starts_with("<svg"));
+}
+
+#[test]
 fn gradient_file_loads_a_palette() {
     let path = std::env::temp_dir().join("sigil_it_palette.gpl");
     std::fs::write(&path, "GIMP Palette\n# c\n255 95 109 Coral\n#ffc371\n").unwrap();

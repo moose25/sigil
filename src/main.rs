@@ -245,6 +245,16 @@ enum Command {
         #[arg(long)]
         seed: Option<u64>,
     },
+    /// Write a self-contained HTML page showcasing your text across fonts,
+    /// gradients, and themes.
+    Gallery {
+        /// Text to showcase (default: Sigil).
+        #[arg(value_name = "TEXT")]
+        text: Vec<String>,
+        /// Write to a file instead of stdout.
+        #[arg(short = 'o', long, value_name = "FILE")]
+        out: Option<std::path::PathBuf>,
+    },
     /// Generate a deterministic geometric mark (logo) from a string, as SVG.
     Mark {
         /// Text the mark is derived from (default: sigil).
@@ -300,6 +310,7 @@ fn run(cli: Cli) -> Result<(), String> {
             background,
             out,
         }) => make_mark(&text, gradient, colors, background, out.as_deref()),
+        Some(Command::Gallery { text, out }) => make_gallery(&text, out.as_deref()),
         None => {
             // With --art the content comes from a file/stdin, not the positional text.
             let text = if cli.art.is_some() {
@@ -1052,6 +1063,106 @@ fn init_config(force: bool, print: bool) -> Result<(), String> {
         .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
     eprintln!("wrote {}", path.display());
     Ok(())
+}
+
+/// Render one showcase SVG for `text` in the given font and gradient.
+fn card_svg(text: &str, font_name: &str, gradient: Gradient) -> Result<String, String> {
+    let font = fonts::load(font_name)?;
+    let banner = Banner::layout(&font, text)?;
+    let opts = RenderOptions {
+        gradient,
+        direction: Direction::Horizontal,
+        align: Align::Left,
+        mode: ColorMode::True,
+        target_width: 0,
+        margin_y: 0,
+        margin_x: 0,
+        reverse: false,
+        cycle: 1,
+        border: None,
+        padding: (0, 0),
+        border_color: None,
+        background: None,
+        background_gradient: None,
+        shade: false,
+        color_by: ColorBy::Banner,
+        shadow: None,
+        outline: None,
+        title: None,
+    };
+    Ok(sigil::render::to_svg(&banner, &opts, None))
+}
+
+/// Write a self-contained HTML gallery of `text` across fonts, gradients, and
+/// themes — a single page you can open in a browser or share.
+fn make_gallery(text_args: &[String], out: Option<&Path>) -> Result<(), String> {
+    let text = if text_args.is_empty() {
+        "Sigil".to_string()
+    } else {
+        text_args.join(" ")
+    };
+    let esc = html_escape(&text);
+    let mut html = String::new();
+    html.push_str(&format!(
+        "<!DOCTYPE html>\n<meta charset=\"utf-8\">\n<title>sigil gallery — {esc}</title>\n\
+         <style>body{{background:#0d1117;color:#c9d1d9;font-family:ui-sans-serif,system-ui,\
+         Segoe UI,Roboto,sans-serif;margin:0;padding:32px}}h1{{font-weight:800}}\
+         h2{{margin-top:40px;border-bottom:1px solid #30363d;padding-bottom:6px}}\
+         .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}}\
+         .card{{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:14px}}\
+         .card svg{{max-width:100%;height:auto}}\
+         .card code{{display:block;margin-top:8px;color:#8b949e;font-size:12px}}</style>\n"
+    ));
+    html.push_str(&format!(
+        "<h1>sigil gallery</h1>\n<p>“{esc}” across every font, gradient, and theme.</p>\n"
+    ));
+
+    // Fonts (rotating gradient so each looks distinct).
+    html.push_str("<h2>Fonts</h2>\n<div class=\"grid\">\n");
+    let grads = Gradient::preset_names();
+    for (i, info) in fonts::catalog().enumerate() {
+        let g = grads[i % grads.len()];
+        let svg = card_svg(&text, info.name, Gradient::preset(g).unwrap())?;
+        html.push_str(&format!(
+            "<div class=\"card\">{svg}<code>-f {} -g {g}</code></div>\n",
+            info.name
+        ));
+    }
+    html.push_str("</div>\n");
+
+    // Gradients (all presets, one readable font).
+    html.push_str("<h2>Gradients</h2>\n<div class=\"grid\">\n");
+    for g in grads {
+        let svg = card_svg(&text, "small", Gradient::preset(g).unwrap())?;
+        html.push_str(&format!(
+            "<div class=\"card\">{svg}<code>-g {g}</code></div>\n"
+        ));
+    }
+    html.push_str("</div>\n");
+
+    // Themes.
+    html.push_str("<h2>Themes</h2>\n<div class=\"grid\">\n");
+    for name in themes::builtin_names() {
+        let t = themes::builtin(name).unwrap();
+        let g = match &t.colors {
+            Some(c) => parse_stops(&c.split(',').map(str::to_string).collect::<Vec<_>>())?,
+            None => Gradient::preset(t.gradient.as_deref().unwrap_or("ocean")).unwrap(),
+        };
+        let svg = card_svg(&text, t.font.as_deref().unwrap_or("standard"), g)?;
+        html.push_str(&format!(
+            "<div class=\"card\">{svg}<code>--theme {name}</code></div>\n"
+        ));
+    }
+    html.push_str("</div>\n");
+
+    write_output(out, &html)
+}
+
+/// Escape text for safe interpolation into HTML.
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 /// Generate a deterministic geometric mark from `text` and write it as SVG.

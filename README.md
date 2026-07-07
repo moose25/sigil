@@ -84,6 +84,7 @@ sigil "Surprise" --random                      # random font + gradient (--seed 
 sigil --lines "deploy" "prod"                   # stack multiple banners in one frame
 sigil "Neo" --theme cyberpunk                   # a curated font+gradient+border+bg bundle
 sigil mark "acme" -g aurora -o mark.svg        # a unique geometric logo from a name
+sigil gallery "Acme" -o gallery.html           # a page of your text in every style
 sigil gradients                               # preview all presets
 sigil fonts                                   # preview all fonts
 sigil "plain" --no-color                      # respects NO_COLOR too
