@@ -166,6 +166,8 @@ enum Command {
     Fonts,
     /// List available themes.
     Themes,
+    /// Render a short showcase gallery.
+    Demo,
     /// Write a starter config file (or print it with --print).
     Init {
         /// Overwrite an existing config file.
@@ -185,6 +187,13 @@ enum Command {
 }
 
 fn main() {
+    // Behave like a normal Unix filter when a reader closes early (e.g. piping
+    // into `head`): die from SIGPIPE instead of panicking on a write error.
+    #[cfg(unix)]
+    unsafe {
+        libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+    }
+
     let cli = Cli::parse();
     if let Err(e) = run(cli) {
         eprintln!("sigil: {e}");
@@ -200,6 +209,7 @@ fn run(cli: Cli) -> Result<(), String> {
             list_themes(&Config::load()?);
             Ok(())
         }
+        Some(Command::Demo) => demo(base_mode(cli.no_color)),
         Some(Command::Init { force, print }) => init_config(force, print),
         Some(Command::Completions { shell }) => {
             print_completions(shell);
@@ -776,6 +786,59 @@ fn init_config(force: bool, print: bool) -> Result<(), String> {
     std::fs::write(&path, sigil::config::STARTER)
         .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
     eprintln!("wrote {}", path.display());
+    Ok(())
+}
+
+/// Render a short showcase of fonts, gradients, and effects.
+fn demo(mode: ColorMode) -> Result<(), String> {
+    // text, font, gradient, border, shadow, outline
+    let examples: &[(&str, &str, &str, &str, bool, bool)] = &[
+        ("sigil", "ansishadow", "vaporwave", "none", false, false),
+        ("boxed", "small", "ocean", "round", false, false),
+        ("depth", "doom", "fire", "none", true, false),
+        ("halo", "ansiregular", "neon", "single", false, true),
+        ("retro", "big", "sunset", "double", false, false),
+    ];
+    for &(text, font, grad, border, shadow, outline) in examples {
+        let mut label = format!("-f {font} -g {grad}");
+        if border != "none" {
+            label.push_str(&format!(" -b {border}"));
+        }
+        if shadow {
+            label.push_str(" --shadow");
+        }
+        if outline {
+            label.push_str(" --outline");
+        }
+        println!("\n{}", bold(&label, mode));
+
+        let f = fonts::load(font)?;
+        let banner = Banner::layout(&f, text)?;
+        let bordered = border != "none";
+        let opts = RenderOptions {
+            gradient: Gradient::preset(grad).unwrap(),
+            direction: Direction::Horizontal,
+            align: Align::Left,
+            mode,
+            target_width: 0,
+            margin_y: 0,
+            reverse: false,
+            cycle: 1,
+            border: Border::parse(border)?,
+            padding: if bordered { (2, 1) } else { (0, 0) },
+            border_color: None,
+            background: None,
+            color_by: ColorBy::Banner,
+            shadow: shadow.then(|| Rgb::new(28, 28, 34)),
+            outline: outline.then(|| Rgb::new(10, 10, 12)),
+            title: None,
+        };
+        print!("{}", paint(&banner, &opts));
+    }
+    println!(
+        "\n{}",
+        bold("Try: sigil \"Your Text\" --theme cyberpunk", mode)
+    );
     Ok(())
 }
 
