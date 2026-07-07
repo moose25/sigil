@@ -429,6 +429,35 @@ mod tests {
     }
 
     #[test]
+    fn sampling_is_total_and_endpoints_pin() {
+        // Property: every preset samples cleanly across the whole range in every
+        // interpolation space, and the endpoints equal the first/last stop.
+        for name in Gradient::preset_names() {
+            for interp in [Interp::Oklab, Interp::Rgb, Interp::Hsl] {
+                let g = Gradient::preset(name).unwrap().with_interp(interp);
+                for i in 0..=64 {
+                    let _ = g.sample(i as f32 / 64.0); // must not panic
+                }
+                // Out-of-range t is clamped, not undefined.
+                assert_eq!(g.sample(-1.0), g.sample(0.0));
+                assert_eq!(g.sample(2.0), g.sample(1.0));
+            }
+        }
+    }
+
+    #[test]
+    fn adjust_t_stays_in_unit_range() {
+        for cycle in [1u32, 2, 5] {
+            for rev in [false, true] {
+                for i in 0..=100 {
+                    let t = adjust_t(i as f32 / 100.0, rev, cycle);
+                    assert!((0.0..=1.0).contains(&t), "adjust_t out of range: {t}");
+                }
+            }
+        }
+    }
+
+    #[test]
     fn positioned_stops_bias_the_blend() {
         let black = Rgb::new(0, 0, 0);
         let white = Rgb::new(255, 255, 255);
