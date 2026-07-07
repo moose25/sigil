@@ -75,6 +75,7 @@ sigil "Ready" --animate type --fps 60         # typewriter reveal
 sigil "Angle" -g rainbow --angle 60 --cycle 2 # tilted, repeating palette
 sigil "Boxed" -g ocean --border round         # frame it in a box
 sigil "Deploy" --icon "🚀" -g fire            # a small icon beside the wordmark
+sigil "Acme" --subtitle "ship faster" -f big  # a logo with a smaller tagline
 sigil "Surprise" --random                      # random font + gradient (--seed N to repeat)
 sigil --lines "deploy" "prod"                   # stack multiple banners in one frame
 sigil "Neo" --theme cyberpunk                   # a curated font+gradient+border+bg bundle
@@ -109,6 +110,8 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 | `-f, --font <name>` | Font (see `sigil fonts`) | `standard` |
 | `--icon <glyph>` | Prefix a small icon/emoji to the left of the banner | — |
 | `--letter-spacing <n>` | Extra blank columns between glyphs (airier look) | — |
+| `--subtitle <text>` | A smaller tagline stacked beneath the banner | — |
+| `--subtitle-font <name>` | Font for the subtitle line | `small` |
 | `-w, --width <cols>` | Target width for alignment | terminal width |
 | `--min-width <cols>` | Pad the banner box out to at least N columns (centered) | — |
 | `-m, --margin <n>` | Blank lines above/below | `0` |

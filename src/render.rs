@@ -230,6 +230,32 @@ impl Banner {
         Banner { lines, width }
     }
 
+    /// Stack `bottom` beneath `top` into one banner, each centered within the
+    /// wider of the two, separated by `gap` blank rows.
+    ///
+    /// The two can come from different fonts — this is how a large headline and
+    /// a smaller subtitle become a single unit that shares one gradient, border,
+    /// and animation.
+    pub fn stacked(top: &Banner, bottom: &Banner, gap: usize) -> Banner {
+        let width = top.width.max(bottom.width);
+        let centered = |b: &Banner| -> Vec<String> {
+            b.lines
+                .iter()
+                .map(|l| {
+                    let pad = width - display_width(l);
+                    let left = pad / 2;
+                    format!("{}{}{}", " ".repeat(left), l, " ".repeat(pad - left))
+                })
+                .collect()
+        };
+        let mut lines = centered(top);
+        for _ in 0..gap {
+            lines.push(" ".repeat(width));
+        }
+        lines.extend(centered(bottom));
+        Banner { lines, width }
+    }
+
     /// Prepend a small icon (an emoji or Nerd Font glyph) to the left of the
     /// banner, vertically centered, with `gap` blank columns between it and the
     /// text. The glyph renders at the terminal's normal cell size — an icon
@@ -859,6 +885,17 @@ mod tests {
             outline: None,
             title: None,
         }
+    }
+
+    #[test]
+    fn stacked_combines_and_centers() {
+        let f = font();
+        let top = Banner::layout(&f, "Headline").unwrap();
+        let bottom = Banner::layout(&f, "sub").unwrap();
+        let s = Banner::stacked(&top, &bottom, 1);
+        assert_eq!(s.width, top.width.max(bottom.width));
+        assert_eq!(s.height(), top.height() + 1 + bottom.height());
+        assert!(s.lines.iter().all(|l| display_width(l) == s.width));
     }
 
     #[test]

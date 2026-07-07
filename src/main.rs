@@ -118,6 +118,14 @@ struct Cli {
     #[arg(long, value_name = "N")]
     letter_spacing: Option<usize>,
 
+    /// A smaller tagline stacked beneath the main banner (logo + subtitle).
+    #[arg(long, value_name = "TEXT")]
+    subtitle: Option<String>,
+
+    /// Font for the --subtitle line. [default: small]
+    #[arg(long, value_name = "NAME")]
+    subtitle_font: Option<String>,
+
     /// Apply a named theme bundle (see `sigil themes`).
     #[arg(short = 't', long)]
     theme: Option<String>,
@@ -295,6 +303,8 @@ struct Settings {
     art: Option<std::path::PathBuf>,
     icon: Option<String>,
     letter_spacing: Option<usize>,
+    subtitle: Option<String>,
+    subtitle_font: String,
     color_by: String,
     interpolate: String,
     title: Option<String>,
@@ -385,6 +395,12 @@ impl Settings {
             interpolate: pick(&cli.interpolate, None, cfg.interpolate, "oklab"),
             icon: cli.icon.clone().or(cfg.icon),
             letter_spacing: cli.letter_spacing.or(cfg.letter_spacing),
+            subtitle: cli.subtitle.clone().or(cfg.subtitle),
+            subtitle_font: cli
+                .subtitle_font
+                .clone()
+                .or(cfg.subtitle_font)
+                .unwrap_or_else(|| "small".to_string()),
             title: cli.title.clone().or(cfg.title),
             shadow: cli.shadow || theme.shadow.unwrap_or(false) || cfg.shadow.unwrap_or(false),
             shadow_color: cli
@@ -460,6 +476,14 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
     } else {
         Banner::layout(&font, text)?
     };
+    // Stack a smaller subtitle beneath the main banner (shared gradient/border).
+    if let Some(sub) = &s.subtitle {
+        if !sub.trim().is_empty() {
+            let sub_font = fonts::load(&s.subtitle_font)?;
+            let sub_banner = Banner::layout(&sub_font, sub)?;
+            banner = Banner::stacked(&banner, &sub_banner, 1);
+        }
+    }
     if let Some(icon) = &s.icon {
         if !icon.is_empty() {
             banner = banner.with_icon(icon, 2);
