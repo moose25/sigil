@@ -92,6 +92,10 @@ struct Cli {
     #[arg(long)]
     fps: Option<u32>,
 
+    /// Render each input line (or argument) as its own stacked banner.
+    #[arg(short = 'l', long)]
+    lines: bool,
+
     /// Pick a random font and gradient for any not explicitly set.
     #[arg(long)]
     random: bool,
@@ -137,7 +141,7 @@ fn run(cli: Cli) -> Result<(), String> {
         }
         Some(Command::Man) => print_man(),
         None => {
-            let text = resolve_text(&cli.text)?;
+            let text = resolve_text(&cli.text, cli.lines)?;
             let config = Config::load()?;
             let settings = Settings::resolve(&cli, config);
             render_banner(&settings, &text)
@@ -176,6 +180,7 @@ struct Settings {
     animate: String,
     fps: u32,
     no_color: bool,
+    lines: bool,
     user_gradients: std::collections::HashMap<String, Vec<String>>,
 }
 
@@ -221,6 +226,7 @@ impl Settings {
             animate: pick(&cli.animate, cfg.animate, "none"),
             fps: cli.fps.or(cfg.fps).unwrap_or(30),
             no_color: cli.no_color,
+            lines: cli.lines,
             user_gradients: cfg.gradients,
         }
     }
@@ -230,9 +236,10 @@ impl Settings {
 /// stdin when no arguments are given and it is piped/redirected. Whitespace
 /// (including newlines) is collapsed to single spaces so piped input renders as
 /// one line.
-fn resolve_text(args: &[String]) -> Result<String, String> {
+fn resolve_text(args: &[String], lines: bool) -> Result<String, String> {
     if !args.is_empty() {
-        return Ok(args.join(" "));
+        // In --lines mode each argument is its own line; otherwise join with spaces.
+        return Ok(args.join(if lines { "\n" } else { " " }));
     }
     if std::io::stdin().is_terminal() {
         return Err(
@@ -243,8 +250,16 @@ fn resolve_text(args: &[String]) -> Result<String, String> {
     std::io::stdin()
         .read_to_string(&mut buf)
         .map_err(|e| format!("failed to read stdin: {e}"))?;
-    let text = buf.split_whitespace().collect::<Vec<_>>().join(" ");
-    if text.is_empty() {
+    let text = if lines {
+        // Preserve line breaks; collapse spaces within each line.
+        buf.lines()
+            .map(|l| l.split_whitespace().collect::<Vec<_>>().join(" "))
+            .collect::<Vec<_>>()
+            .join("\n")
+    } else {
+        buf.split_whitespace().collect::<Vec<_>>().join(" ")
+    };
+    if text.trim().is_empty() {
         return Err("no text on stdin".to_string());
     }
     Ok(text)
@@ -259,7 +274,16 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         None => Direction::parse(&s.direction)?,
     };
     let align = Align::parse(&s.align)?;
-    let banner = Banner::layout(&font, text)?;
+    let banner = if s.lines {
+        let parts: Vec<&str> = text
+            .split('\n')
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .collect();
+        Banner::layout_multi(&font, &parts)?
+    } else {
+        Banner::layout(&font, text)?
+    };
     let mode = color_mode(s, format);
     let anim = Anim::parse(&s.animate)?;
 
@@ -550,6 +574,8 @@ mod tests {
     #[test]
     fn joins_multi_word_text() {
         let args = vec!["Hello".to_string(), "World".to_string()];
-        assert_eq!(resolve_text(&args).unwrap(), "Hello World");
+        assert_eq!(resolve_text(&args, false).unwrap(), "Hello World");
+        // In --lines mode each argument becomes its own line.
+        assert_eq!(resolve_text(&args, true).unwrap(), "Hello\nWorld");
     }
 }
