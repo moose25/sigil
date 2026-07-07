@@ -139,6 +139,11 @@ struct Cli {
     #[arg(short = 'F', long)]
     format: Option<String>,
 
+    /// For a code-snippet format, emit a `print_banner` function instead of a
+    /// bare constant.
+    #[arg(long)]
+    func: bool,
+
     /// Write output to a file instead of stdout.
     #[arg(short = 'o', long, value_name = "FILE")]
     out: Option<std::path::PathBuf>,
@@ -279,6 +284,7 @@ struct Settings {
     min_width: Option<usize>,
     width: Option<usize>,
     format: String,
+    func: bool,
     out: Option<std::path::PathBuf>,
     animate: String,
     fps: u32,
@@ -365,6 +371,7 @@ impl Settings {
             min_width: cli.min_width.or(cfg.min_width),
             width: cli.width.or(cfg.width),
             format: pick(&cli.format, None, cfg.format, "term"),
+            func: cli.func || cfg.func.unwrap_or(false),
             out: cli.out.clone(),
             animate: pick(&cli.animate, None, cfg.animate, "none"),
             fps: cli.fps.or(cfg.fps).unwrap_or(30),
@@ -574,7 +581,7 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
     }
 
     let painted = paint(&banner, &opts);
-    let output = export::wrap(format, &painted);
+    let output = export::wrap(format, &painted, s.func);
     emit(s, &output)
 }
 

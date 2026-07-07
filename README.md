@@ -164,6 +164,13 @@ best with block fonts like `ansishadow`/`ansiregular`).
 
 The `rust`/`go`/`python`/`js`/`ts`/`c`/`cpp`/`ruby` snippets define a `BANNER` constant (with a comment showing how to print it); `shell` is a runnable heredoc. Color is baked into every snippet format. Use `-o <file>` instead of a shell redirect if you prefer.
 
+Prefer a ready-to-call function over a bare constant? Add `--func`:
+
+```sh
+sigil "Acme" -g sunset -F rust --func > src/banner.rs   # pub fn print_banner() { … }
+sigil "Acme" -g sunset -F python --func > banner.py      # def print_banner(): …
+```
+
 ## Config
 
 Set defaults so you don't repeat flags. sigil reads two optional files and merges them, then command-line flags override everything:
