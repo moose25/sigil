@@ -41,6 +41,7 @@ pub struct Config {
     pub margin: Option<usize>,
     pub margin_x: Option<usize>,
     pub min_width: Option<usize>,
+    pub wrap: Option<usize>,
     pub width: Option<usize>,
     pub animate: Option<String>,
     pub fps: Option<u32>,
@@ -109,6 +110,7 @@ impl Config {
             margin,
             margin_x,
             min_width,
+            wrap,
             width,
             animate,
             fps,
@@ -153,6 +155,7 @@ pub const STARTER: &str = "\
 # align   = \"center\"             # left | center | right
 # margin  = 0                     # blank lines above/below
 # width   = 80                    # alignment width (default: terminal)
+# wrap    = 60                    # word-wrap long text to fit N columns
 
 # --- frame & effects ---
 # border       = \"round\"         # none | round | single | double | heavy | ascii

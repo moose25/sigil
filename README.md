@@ -110,6 +110,7 @@ sigil "Angle" -g rainbow --angle 60 --cycle 2 # tilted, repeating palette
 sigil "Boxed" -g ocean --border round         # frame it in a box
 sigil "Surprise" --random                      # random font + gradient (--seed N to repeat)
 sigil --lines "deploy" "prod"                   # stack multiple banners in one frame
+sigil "A long project tagline" --wrap 60        # word-wrap long text to fit 60 cols
 sigil "Neo" --theme cyberpunk                   # a curated font+gradient+border+bg bundle
 sigil gradients                               # preview all presets
 sigil fonts                                   # preview all fonts
@@ -142,6 +143,7 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 | `-f, --font <name>` | Font (see `sigil fonts`) | `standard` |
 | `-w, --width <cols>` | Target width for alignment | terminal width |
 | `--min-width <cols>` | Pad the banner box out to at least N columns (centered) | — |
+| `--wrap <cols>` | Word-wrap long text so each rendered line fits within N columns (alias `--max-width`) | — |
 | `-m, --margin <n>` | Blank lines above/below | `0` |
 | `--margin-x <n>` | Left indent in columns (on top of alignment) | `0` |
 | `-F, --format <fmt>` | `term` \| `ansi` \| `raw` \| `rust` \| `go` \| `python` \| `shell` | `term` |

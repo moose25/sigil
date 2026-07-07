@@ -122,6 +122,10 @@ struct Cli {
     #[arg(long)]
     min_width: Option<usize>,
 
+    /// Word-wrap long text so each rendered line fits within N columns.
+    #[arg(long, visible_alias = "max-width", value_name = "COLS")]
+    wrap: Option<usize>,
+
     /// Blank lines above and below the banner. [default: 0]
     #[arg(short = 'm', long)]
     margin: Option<usize>,
@@ -296,6 +300,7 @@ struct Settings {
     margin: usize,
     margin_x: usize,
     min_width: Option<usize>,
+    wrap: Option<usize>,
     width: Option<usize>,
     format: String,
     out: Option<std::path::PathBuf>,
@@ -382,6 +387,7 @@ impl Settings {
             margin: cli.margin.or(cfg.margin).unwrap_or(0),
             margin_x: cli.margin_x.or(cfg.margin_x).unwrap_or(0),
             min_width: cli.min_width.or(cfg.min_width),
+            wrap: cli.wrap.or(cfg.wrap),
             width: cli.width.or(cfg.width),
             format: pick(&cli.format, None, cfg.format, "term"),
             out: cli.out.clone(),
@@ -463,6 +469,8 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
             .filter(|l| !l.is_empty())
             .collect();
         Banner::layout_multi(&font, &parts)?
+    } else if let Some(cols) = s.wrap {
+        Banner::layout_wrapped(&font, text, cols)?
     } else {
         Banner::layout(&font, text)?
     };
