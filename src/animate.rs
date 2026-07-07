@@ -25,6 +25,8 @@ pub enum Anim {
     Type,
     /// A brightness pulse — the banner breathes between dim and full.
     Pulse,
+    /// A marquee that scrolls the banner horizontally.
+    Scroll,
 }
 
 impl Anim {
@@ -34,7 +36,10 @@ impl Anim {
             "sweep" | "shimmer" => Ok(Anim::Sweep),
             "type" | "typewriter" => Ok(Anim::Type),
             "pulse" | "breathe" => Ok(Anim::Pulse),
-            _ => Err(format!("unknown animation: {s} (none|sweep|type|pulse)")),
+            "scroll" | "marquee" => Ok(Anim::Scroll),
+            _ => Err(format!(
+                "unknown animation: {s} (none|sweep|type|pulse|scroll)"
+            )),
         }
     }
 
@@ -99,8 +104,67 @@ pub fn play(
             }
             draw(out, &frame(&grid, opts, 0.0, None, 1.0), height, false)?;
         }
+        Anim::Scroll => {
+            // Marquee across the terminal width; loop twice, then settle at the start.
+            let vw = if opts.target_width > 0 {
+                opts.target_width
+            } else {
+                grid.width
+            };
+            const GAP: usize = 4;
+            let period = grid.width + GAP;
+            for i in 0..(period * 2) {
+                draw(
+                    out,
+                    &scroll_frame(&grid, opts, i % period, vw),
+                    height,
+                    i == 0,
+                )?;
+                sleep(delay);
+            }
+            draw(out, &scroll_frame(&grid, opts, 0, vw), height, false)?;
+        }
     }
     Ok(())
+}
+
+/// A marquee frame: a `vw`-wide viewport onto the grid, shifted left by
+/// `offset` and wrapping with a gap.
+fn scroll_frame(grid: &Grid, opts: &RenderOptions, offset: usize, vw: usize) -> String {
+    const GAP: usize = 4;
+    let period = grid.width + GAP;
+    let bg = opts
+        .background
+        .filter(|_| opts.mode != crate::color::ColorMode::None)
+        .map(|c| opts.mode.bg(c));
+    let mut out = String::new();
+    for row in 0..grid.height {
+        if let Some(bg) = &bg {
+            out.push_str(bg);
+        }
+        let mut last = None;
+        for vc in 0..vw {
+            let src = (vc + offset) % period;
+            let ch = if src < grid.width {
+                grid.chars[row][src]
+            } else {
+                ' ' // the gap between wraps
+            };
+            if ch == crate::render::CONT || ch == ' ' {
+                out.push(' ');
+                continue;
+            }
+            let color = cell_color(grid, opts, row, src, 0.0);
+            if opts.mode != crate::color::ColorMode::None && last != Some(color) {
+                out.push_str(&opts.mode.fg(color));
+                last = Some(color);
+            }
+            out.push(ch);
+        }
+        out.push_str(opts.mode.reset());
+        out.push('\n');
+    }
+    out
 }
 
 /// Scale an RGB color's brightness by `f` in `[0, 1]`.
