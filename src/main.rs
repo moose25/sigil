@@ -61,6 +61,14 @@ struct Cli {
     #[arg(long, visible_alias = "bg", value_name = "HEX")]
     background: Option<String>,
 
+    /// Draw a drop shadow behind the glyphs.
+    #[arg(long)]
+    shadow: bool,
+
+    /// Drop-shadow color as a hex value (default: dark gray).
+    #[arg(long, value_name = "HEX")]
+    shadow_color: Option<String>,
+
     /// Alignment within the terminal width: left | center | right. [default: left]
     #[arg(short, long)]
     align: Option<String>,
@@ -202,6 +210,8 @@ struct Settings {
     no_color: bool,
     lines: bool,
     color_by: String,
+    shadow: bool,
+    shadow_color: Option<String>,
     user_gradients: std::collections::HashMap<String, Vec<String>>,
 }
 
@@ -275,6 +285,8 @@ impl Settings {
             no_color: cli.no_color,
             lines: cli.lines,
             color_by: pick(&cli.color_by, None, cfg.color_by, "banner"),
+            shadow: cli.shadow || cfg.shadow.unwrap_or(false),
+            shadow_color: cli.shadow_color.clone().or(cfg.shadow_color),
             user_gradients: cfg.gradients,
         })
     }
@@ -353,6 +365,14 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         None => None,
     };
     let color_by = ColorBy::parse(&s.color_by)?;
+    let shadow = if s.shadow {
+        Some(match &s.shadow_color {
+            Some(hex) => Rgb::parse(hex)?,
+            None => Rgb::new(28, 28, 34),
+        })
+    } else {
+        None
+    };
 
     // Framed width includes the border and padding.
     let framed_w = banner.width + 2 * padding.0 + if border.is_some() { 2 } else { 0 };
@@ -378,6 +398,7 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         border_color,
         background,
         color_by,
+        shadow,
     };
 
     // SVG/HTML are rendered directly from the grid, not from painted ANSI.
@@ -561,6 +582,7 @@ fn preview_font(
         border_color: None,
         background: None,
         color_by: ColorBy::Banner,
+        shadow: None,
     };
     print!("{}", paint(&banner, &opts));
     Ok(())

@@ -189,6 +189,8 @@ pub struct RenderOptions {
     pub background: Option<Rgb>,
     /// How the gradient is mapped across the banner.
     pub color_by: ColorBy,
+    /// Drop-shadow color behind the glyphs; `None` disables the shadow.
+    pub shadow: Option<Rgb>,
 }
 
 /// The banner, padding, and any frame composited into a character grid.
@@ -199,36 +201,65 @@ pub struct RenderOptions {
 pub struct Grid {
     pub chars: Vec<Vec<char>>,
     pub is_frame: Vec<Vec<bool>>,
+    pub is_shadow: Vec<Vec<bool>>,
     pub width: usize,
     pub height: usize,
 }
 
-/// Composite a banner (with padding and optional frame) into a [`Grid`].
-pub fn compose(banner: &Banner, border: Option<Border>, padding: (usize, usize)) -> Grid {
+/// Drop-shadow offset (columns, rows) — down and to the right.
+const SHADOW: (usize, usize) = (1, 1);
+
+/// Composite a banner (with padding, optional frame, optional shadow) into a
+/// [`Grid`].
+pub fn compose(
+    banner: &Banner,
+    border: Option<Border>,
+    padding: (usize, usize),
+    shadow: bool,
+) -> Grid {
     let (px, py) = padding;
     let edge = if border.is_some() { 1 } else { 0 };
-    let width = banner.width + 2 * px + 2 * edge;
-    let height = banner.height() + 2 * py + 2 * edge;
+    let (sdx, sdy) = if shadow { SHADOW } else { (0, 0) };
+    let width = banner.width + sdx + 2 * px + 2 * edge;
+    let height = banner.height() + sdy + 2 * py + 2 * edge;
     let (ox, oy) = (edge + px, edge + py);
 
     let mut chars = vec![vec![' '; width]; height];
     let mut is_frame = vec![vec![false; width]; height];
-    for (r, line) in banner.lines.iter().enumerate() {
-        // Advance by each glyph's display width so wide glyphs occupy two
-        // columns: the glyph itself and a continuation sentinel.
-        let mut col = ox;
-        for ch in line.chars() {
-            let w = UnicodeWidthChar::width(ch).unwrap_or(0);
-            if w == 0 || col >= width {
-                continue;
+    let mut is_shadow = vec![vec![false; width]; height];
+
+    // Place a banner's glyphs at (base_row, base_col); `shadow` marks the layer.
+    let place = |chars: &mut Vec<Vec<char>>,
+                 is_shadow: &mut Vec<Vec<bool>>,
+                 bx: usize,
+                 by: usize,
+                 mark_shadow: bool| {
+        for (r, line) in banner.lines.iter().enumerate() {
+            let mut col = bx;
+            for ch in line.chars() {
+                let w = UnicodeWidthChar::width(ch).unwrap_or(0);
+                if w == 0 || col >= width {
+                    continue;
+                }
+                if ch != ' ' {
+                    chars[by + r][col] = ch;
+                    is_shadow[by + r][col] = mark_shadow;
+                    if w == 2 && col + 1 < width {
+                        chars[by + r][col + 1] = CONT;
+                        is_shadow[by + r][col + 1] = mark_shadow;
+                    }
+                }
+                col += w;
             }
-            chars[oy + r][col] = ch;
-            if w == 2 && col + 1 < width {
-                chars[oy + r][col + 1] = CONT;
-            }
-            col += w;
         }
+    };
+
+    // Shadow first (offset), then the main glyphs overwrite where they overlap.
+    if shadow {
+        place(&mut chars, &mut is_shadow, ox + sdx, oy + sdy, true);
     }
+    place(&mut chars, &mut is_shadow, ox, oy, false);
+
     if let Some(b) = border {
         let (top, bot, left, right) = (0, height - 1, 0, width - 1);
         for col in 0..width {
@@ -236,6 +267,8 @@ pub fn compose(banner: &Banner, border: Option<Border>, padding: (usize, usize))
             chars[bot][col] = b.h;
             is_frame[top][col] = true;
             is_frame[bot][col] = true;
+            is_shadow[top][col] = false;
+            is_shadow[bot][col] = false;
         }
         for row in chars.iter_mut() {
             row[left] = b.v;
@@ -245,6 +278,10 @@ pub fn compose(banner: &Banner, border: Option<Border>, padding: (usize, usize))
             r[left] = true;
             r[right] = true;
         }
+        for r in is_shadow.iter_mut() {
+            r[left] = false;
+            r[right] = false;
+        }
         chars[top][left] = b.tl;
         chars[top][right] = b.tr;
         chars[bot][left] = b.bl;
@@ -253,6 +290,7 @@ pub fn compose(banner: &Banner, border: Option<Border>, padding: (usize, usize))
     Grid {
         chars,
         is_frame,
+        is_shadow,
         width,
         height,
     }
@@ -261,6 +299,11 @@ pub fn compose(banner: &Banner, border: Option<Border>, padding: (usize, usize))
 /// The color of the non-space cell at (row, col), honoring a solid frame color,
 /// the gradient direction, reverse/cycle, and an animation `phase` shift.
 pub fn cell_color(grid: &Grid, opts: &RenderOptions, row: usize, col: usize, phase: f32) -> Rgb {
+    if let Some(sc) = opts.shadow {
+        if grid.is_shadow[row][col] {
+            return sc;
+        }
+    }
     if let Some(c) = opts.border_color {
         if grid.is_frame[row][col] {
             return c;
@@ -285,7 +328,7 @@ pub fn cell_color(grid: &Grid, opts: &RenderOptions, row: usize, col: usize, pha
 
 /// Paint `banner` into a printable string with ANSI color escapes.
 pub fn paint(banner: &Banner, opts: &RenderOptions) -> String {
-    let grid = compose(banner, opts.border, opts.padding);
+    let grid = compose(banner, opts.border, opts.padding, opts.shadow.is_some());
 
     let slack = opts.target_width.saturating_sub(grid.width);
     let indent = match opts.align {
@@ -359,7 +402,7 @@ fn svg_impl(
     background: Option<Rgb>,
     animate: bool,
 ) -> String {
-    let grid = compose(banner, opts.border, opts.padding);
+    let grid = compose(banner, opts.border, opts.padding, opts.shadow.is_some());
     let font_size = 24.0_f32;
     let cell_w = font_size * 0.6; // monospace advance width
     let line_h = font_size * 1.2;
@@ -461,7 +504,7 @@ fn push_animated_span(
 /// Render the banner as a standalone HTML document: a `<pre>` of colored
 /// `<span>`s, for embedding in web pages, docs, or HTML email.
 pub fn to_html(banner: &Banner, opts: &RenderOptions, background: Option<Rgb>) -> String {
-    let grid = compose(banner, opts.border, opts.padding);
+    let grid = compose(banner, opts.border, opts.padding, opts.shadow.is_some());
     let bg = background.unwrap_or(Rgb::new(13, 17, 23));
 
     let mut s = String::new();
@@ -564,6 +607,7 @@ mod tests {
             border_color: None,
             background: None,
             color_by: ColorBy::Banner,
+            shadow: None,
         }
     }
 
@@ -599,7 +643,7 @@ mod tests {
         let distinct = |cb: ColorBy| {
             let mut o = base_opts(ColorMode::True);
             o.color_by = cb;
-            let grid = compose(&b, None, (0, 0));
+            let grid = compose(&b, None, (0, 0), false);
             let mut set = std::collections::HashSet::new();
             for r in 0..grid.height {
                 for c in 0..grid.width {
@@ -635,12 +679,28 @@ mod tests {
     }
 
     #[test]
+    fn shadow_grows_grid_and_marks_cells() {
+        let banner = Banner {
+            lines: vec!["A".to_string()],
+            width: 1,
+        };
+        let plain = compose(&banner, None, (0, 0), false);
+        let shad = compose(&banner, None, (0, 0), true);
+        // Shadow adds one column and one row.
+        assert_eq!(shad.width, plain.width + 1);
+        assert_eq!(shad.height, plain.height + 1);
+        // Some cell is marked as shadow, and the main glyph is not.
+        assert!(shad.is_shadow.iter().any(|row| row.iter().any(|&s| s)));
+        assert!(!shad.is_shadow[0][0]); // top-left is the main glyph
+    }
+
+    #[test]
     fn wide_glyphs_align_by_display_width() {
         let banner = Banner {
             lines: vec!["日x".to_string(), "ab".to_string()],
             width: 3, // 日(2) + x(1)
         };
-        let g = compose(&banner, None, (0, 0));
+        let g = compose(&banner, None, (0, 0), false);
         assert_eq!(g.width, 3);
         assert_eq!(g.chars[0][0], '日');
         assert_eq!(g.chars[0][1], CONT);
