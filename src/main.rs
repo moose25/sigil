@@ -235,6 +235,24 @@ enum Command {
         #[arg(long)]
         seed: Option<u64>,
     },
+    /// Generate a deterministic geometric mark (logo) from a string, as SVG.
+    Mark {
+        /// Text the mark is derived from (default: sigil).
+        #[arg(value_name = "TEXT")]
+        text: Vec<String>,
+        /// Named gradient preset. [default: aurora]
+        #[arg(short, long)]
+        gradient: Option<String>,
+        /// Custom gradient stops (overrides --gradient).
+        #[arg(short = 'c', long)]
+        colors: Option<String>,
+        /// Background fill hex (alias --bg).
+        #[arg(long, visible_alias = "bg", value_name = "HEX")]
+        background: Option<String>,
+        /// Write to a file instead of stdout.
+        #[arg(short = 'o', long, value_name = "FILE")]
+        out: Option<std::path::PathBuf>,
+    },
 }
 
 fn main() {
@@ -265,6 +283,13 @@ fn run(cli: Cli) -> Result<(), String> {
         }
         Some(Command::Man) => print_man(),
         Some(Command::Random { text, seed }) => random_banner(base_mode(cli.no_color), &text, seed),
+        Some(Command::Mark {
+            text,
+            gradient,
+            colors,
+            background,
+            out,
+        }) => make_mark(&text, gradient, colors, background, out.as_deref()),
         None => {
             // With --art the content comes from a file/stdin, not the positional text.
             let text = if cli.art.is_some() {
@@ -984,6 +1009,34 @@ fn init_config(force: bool, print: bool) -> Result<(), String> {
         .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
     eprintln!("wrote {}", path.display());
     Ok(())
+}
+
+/// Generate a deterministic geometric mark from `text` and write it as SVG.
+fn make_mark(
+    text_args: &[String],
+    gradient: Option<String>,
+    colors: Option<String>,
+    background: Option<String>,
+    out: Option<&Path>,
+) -> Result<(), String> {
+    let text = if text_args.is_empty() {
+        "sigil".to_string()
+    } else {
+        text_args.join(" ")
+    };
+    let grad = if let Some(list) = &colors {
+        parse_stops(&list.split(',').map(str::to_string).collect::<Vec<_>>())
+            .map_err(|e| format!("--colors: {e}"))?
+    } else {
+        let name = gradient.as_deref().unwrap_or("aurora");
+        Gradient::preset(name).ok_or_else(|| format!("unknown gradient: {name}"))?
+    };
+    let bg = match &background {
+        Some(hex) => Some(Rgb::parse(hex)?),
+        None => None,
+    };
+    let svg = sigil::mark::to_svg(&text, &grad, bg);
+    write_output(out, &svg)
 }
 
 /// Render a random banner (font + gradient + maybe a border/shadow) and print

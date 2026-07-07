@@ -82,6 +82,7 @@ sigil "Acme" --subtitle "ship faster" -f big  # a logo with a smaller tagline
 sigil "Surprise" --random                      # random font + gradient (--seed N to repeat)
 sigil --lines "deploy" "prod"                   # stack multiple banners in one frame
 sigil "Neo" --theme cyberpunk                   # a curated font+gradient+border+bg bundle
+sigil mark "acme" -g aurora -o mark.svg        # a unique geometric logo from a name
 sigil gradients                               # preview all presets
 sigil fonts                                   # preview all fonts
 sigil "plain" --no-color                      # respects NO_COLOR too
