@@ -306,6 +306,24 @@ pub fn paint(banner: &Banner, opts: &RenderOptions) -> String {
 /// suitable for embedding in a README or docs. `background` fills the canvas;
 /// when `None` a dark backdrop is used so light gradients stay readable.
 pub fn to_svg(banner: &Banner, opts: &RenderOptions, background: Option<Rgb>) -> String {
+    svg_impl(banner, opts, background, false)
+}
+
+/// Like [`to_svg`], but the gradient shimmers via SMIL animation (a browser /
+/// GitHub renders it as a looping animated banner — no gif tooling needed).
+pub fn to_svg_animated(banner: &Banner, opts: &RenderOptions, background: Option<Rgb>) -> String {
+    svg_impl(banner, opts, background, true)
+}
+
+/// Number of gradient samples per animation cycle.
+const SVG_ANIM_STEPS: usize = 24;
+
+fn svg_impl(
+    banner: &Banner,
+    opts: &RenderOptions,
+    background: Option<Rgb>,
+    animate: bool,
+) -> String {
     let grid = compose(banner, opts.border, opts.padding);
     let font_size = 24.0_f32;
     let cell_w = font_size * 0.6; // monospace advance width
@@ -331,33 +349,78 @@ pub fn to_svg(banner: &Banner, opts: &RenderOptions, background: Option<Rgb>) ->
     for row in 0..grid.height {
         let y = (row as f32 + 0.8) * line_h;
         s.push_str(&format!("<tspan x=\"0\" y=\"{y:.1}\">"));
-        // Group consecutive cells sharing a fill; spaces extend the current run.
-        let mut run = String::new();
-        let mut fill: Option<Rgb> = None;
-        for col in 0..grid.width {
-            let ch = grid.chars[row][col];
-            if ch == CONT {
-                continue;
+        if animate {
+            for col in 0..grid.width {
+                let ch = grid.chars[row][col];
+                if ch == CONT {
+                    continue;
+                }
+                if ch == ' ' {
+                    s.push(' ');
+                    continue;
+                }
+                push_animated_span(&mut s, ch, &grid, opts, row, col);
             }
-            let cell_fill = if ch == ' ' {
-                fill // keep current color under spaces (invisible anyway)
-            } else {
-                Some(cell_color(&grid, opts, row, col, 0.0))
-            };
-            if ch != ' ' && cell_fill != fill && !run.is_empty() {
-                push_span(&mut s, &run, fill);
-                run.clear();
+        } else {
+            // Group consecutive cells sharing a fill; spaces extend the current run.
+            let mut run = String::new();
+            let mut fill: Option<Rgb> = None;
+            for col in 0..grid.width {
+                let ch = grid.chars[row][col];
+                if ch == CONT {
+                    continue;
+                }
+                let cell_fill = if ch == ' ' {
+                    fill
+                } else {
+                    Some(cell_color(&grid, opts, row, col, 0.0))
+                };
+                if ch != ' ' && cell_fill != fill && !run.is_empty() {
+                    push_span(&mut s, &run, fill);
+                    run.clear();
+                }
+                if ch != ' ' {
+                    fill = cell_fill;
+                }
+                run.push(ch);
             }
-            if ch != ' ' {
-                fill = cell_fill;
-            }
-            run.push(ch);
+            push_span(&mut s, &run, fill);
         }
-        push_span(&mut s, &run, fill);
         s.push_str("</tspan>\n");
     }
     s.push_str("</text>\n</svg>\n");
     s
+}
+
+/// Emit an animated `<tspan>` whose fill cycles through the gradient sweep.
+fn push_animated_span(
+    out: &mut String,
+    ch: char,
+    grid: &Grid,
+    opts: &RenderOptions,
+    row: usize,
+    col: usize,
+) {
+    // Sample the color at each phase; the last equals the first for a seamless loop.
+    let values: Vec<String> = (0..=SVG_ANIM_STEPS)
+        .map(|i| {
+            hex(cell_color(
+                grid,
+                opts,
+                row,
+                col,
+                i as f32 / SVG_ANIM_STEPS as f32,
+            ))
+        })
+        .collect();
+    out.push_str(&format!("<tspan fill=\"{}\">", values[0]));
+    out.push_str(&format!(
+        "<animate attributeName=\"fill\" dur=\"2s\" repeatCount=\"indefinite\" \
+         calcMode=\"linear\" values=\"{}\"/>",
+        values.join(";")
+    ));
+    out.push_str(&xml_escape(&ch.to_string()));
+    out.push_str("</tspan>");
 }
 
 /// Emit a `<tspan>` for a run of text with an optional fill color.
@@ -428,6 +491,17 @@ mod tests {
     #[test]
     fn xml_special_chars_escaped() {
         assert_eq!(xml_escape("a<b>&c"), "a&lt;b&gt;&amp;c");
+    }
+
+    #[test]
+    fn animated_svg_has_animate_elements() {
+        let b = Banner::layout(&font(), "Hi").unwrap();
+        let svg = to_svg_animated(&b, &base_opts(ColorMode::True), None);
+        assert!(svg.contains("<animate "));
+        assert!(svg.contains("repeatCount=\"indefinite\""));
+        assert!(svg.trim_end().ends_with("</svg>"));
+        // Static SVG has no animation.
+        assert!(!to_svg(&b, &base_opts(ColorMode::True), None).contains("<animate"));
     }
 
     #[test]

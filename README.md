@@ -123,7 +123,8 @@ sigil "Acme" -g sunset -F svg    > banner.svg        # standalone SVG image
 ```
 
 `-F svg` produces a self-contained SVG (colored monospace grid on a dark
-backdrop) — drop it straight into a README or docs.
+backdrop) — drop it straight into a README or docs. Add `--animate sweep` for an
+**animated** SVG whose gradient shimmers in the browser (no gif tooling needed).
 
 The `rust`/`go`/`python` snippets define a `BANNER` constant (with a comment showing how to print it); `shell` is a runnable heredoc. Color is baked into every snippet format. Use `-o <file>` instead of a shell redirect if you prefer.
 
