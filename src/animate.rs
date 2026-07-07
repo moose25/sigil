@@ -23,6 +23,8 @@ pub enum Anim {
     Sweep,
     /// A left-to-right typewriter reveal, column by column.
     Type,
+    /// A brightness pulse — the banner breathes between dim and full.
+    Pulse,
 }
 
 impl Anim {
@@ -31,7 +33,8 @@ impl Anim {
             "none" | "off" => Ok(Anim::None),
             "sweep" | "shimmer" => Ok(Anim::Sweep),
             "type" | "typewriter" => Ok(Anim::Type),
-            _ => Err(format!("unknown animation: {s} (none|sweep|type)")),
+            "pulse" | "breathe" => Ok(Anim::Pulse),
+            _ => Err(format!("unknown animation: {s} (none|sweep|type|pulse)")),
         }
     }
 
@@ -55,7 +58,7 @@ pub fn play(
 
     match style {
         Anim::None => {
-            out.write_all(frame(&grid, opts, 0.0, None).as_bytes())?;
+            out.write_all(frame(&grid, opts, 0.0, None, 1.0).as_bytes())?;
         }
         Anim::Sweep => {
             // Scroll the gradient for ~2 seconds (one cycle per second), then
@@ -63,29 +66,59 @@ pub fn play(
             let frames = fps as usize * 2;
             for i in 0..frames {
                 let phase = i as f32 / fps as f32;
-                draw(out, &frame(&grid, opts, phase, None), height, i == 0)?;
+                draw(out, &frame(&grid, opts, phase, None, 1.0), height, i == 0)?;
                 sleep(delay);
             }
-            draw(out, &frame(&grid, opts, 0.0, None), height, false)?;
+            draw(out, &frame(&grid, opts, 0.0, None, 1.0), height, false)?;
         }
         Anim::Type => {
             for reveal in 0..=grid.width {
                 draw(
                     out,
-                    &frame(&grid, opts, 0.0, Some(reveal)),
+                    &frame(&grid, opts, 0.0, Some(reveal), 1.0),
                     height,
                     reveal == 0,
                 )?;
                 sleep(delay);
             }
         }
+        Anim::Pulse => {
+            // Breathe brightness over ~3 seconds (period 1.5s), then settle full.
+            let frames = fps as usize * 3;
+            for i in 0..frames {
+                let t = i as f32 / fps as f32;
+                let phase = (std::f32::consts::TAU * t / 1.5).cos();
+                let brightness = 0.35 + 0.65 * (0.5 - 0.5 * phase); // 0.35..=1.0
+                draw(
+                    out,
+                    &frame(&grid, opts, 0.0, None, brightness),
+                    height,
+                    i == 0,
+                )?;
+                sleep(delay);
+            }
+            draw(out, &frame(&grid, opts, 0.0, None, 1.0), height, false)?;
+        }
     }
     Ok(())
 }
 
-/// Render one frame of the grid: `phase` shifts the gradient (sweep), and
-/// `reveal`, when set, hides every column at or past it (typewriter).
-fn frame(grid: &Grid, opts: &RenderOptions, phase: f32, reveal: Option<usize>) -> String {
+/// Scale an RGB color's brightness by `f` in `[0, 1]`.
+fn dim(c: crate::color::Rgb, f: f32) -> crate::color::Rgb {
+    let s = |v: u8| (v as f32 * f).round().clamp(0.0, 255.0) as u8;
+    crate::color::Rgb::new(s(c.r), s(c.g), s(c.b))
+}
+
+/// Render one frame of the grid: `phase` shifts the gradient (sweep), `reveal`
+/// hides columns at/after it (typewriter), and `brightness` scales all colors
+/// (pulse).
+fn frame(
+    grid: &Grid,
+    opts: &RenderOptions,
+    phase: f32,
+    reveal: Option<usize>,
+    brightness: f32,
+) -> String {
     let mut out = String::new();
     let bg = opts
         .background
@@ -110,7 +143,10 @@ fn frame(grid: &Grid, opts: &RenderOptions, phase: f32, reveal: Option<usize>) -
                 out.push(' ');
                 continue;
             }
-            let color = cell_color(grid, opts, row, col, phase);
+            let mut color = cell_color(grid, opts, row, col, phase);
+            if brightness < 1.0 {
+                color = dim(color, brightness);
+            }
             if opts.mode != crate::color::ColorMode::None && last != Some(color) {
                 out.push_str(&opts.mode.fg(color));
                 last = Some(color);
@@ -171,8 +207,15 @@ mod tests {
     fn parses_styles() {
         assert_eq!(Anim::parse("sweep").unwrap(), Anim::Sweep);
         assert_eq!(Anim::parse("Typewriter").unwrap(), Anim::Type);
+        assert_eq!(Anim::parse("breathe").unwrap(), Anim::Pulse);
         assert_eq!(Anim::parse("off").unwrap(), Anim::None);
         assert!(Anim::parse("wobble").is_err());
+    }
+
+    #[test]
+    fn dim_scales_brightness() {
+        assert_eq!(dim(Rgb::new(200, 100, 50), 0.5), Rgb::new(100, 50, 25));
+        assert_eq!(dim(Rgb::new(200, 100, 50), 1.0), Rgb::new(200, 100, 50));
     }
 
     #[test]
@@ -180,8 +223,8 @@ mod tests {
         let b = banner();
         let o = opts(ColorMode::None, None);
         let grid = compose(&b, &o);
-        let none = frame(&grid, &o, 0.0, Some(0));
-        let full = frame(&grid, &o, 0.0, Some(grid.width));
+        let none = frame(&grid, &o, 0.0, Some(0), 1.0);
+        let full = frame(&grid, &o, 0.0, Some(grid.width), 1.0);
         assert!(none.chars().all(|c| c == ' ' || c == '\n'));
         assert!(full.chars().any(|c| !c.is_whitespace()));
     }
@@ -191,7 +234,7 @@ mod tests {
         let b = banner();
         let o = opts(ColorMode::True, None);
         let grid = compose(&b, &o);
-        let f = frame(&grid, &o, 0.25, None);
+        let f = frame(&grid, &o, 0.25, None, 1.0);
         assert_eq!(f.lines().count(), grid.height);
         assert!(f.contains("\x1b[38;2;"));
     }
@@ -202,7 +245,7 @@ mod tests {
         let o = opts(ColorMode::None, Border::parse("round").unwrap());
         let grid = compose(&b, &o);
         // A mid-reveal frame should already include the top-left corner.
-        let f = frame(&grid, &o, 0.0, Some(1));
+        let f = frame(&grid, &o, 0.0, Some(1), 1.0);
         assert!(f.contains('╭'));
     }
 }
