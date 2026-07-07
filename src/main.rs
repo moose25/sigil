@@ -15,9 +15,9 @@ use sigil::render::{paint, Align, Banner, Border, RenderOptions};
 #[derive(Parser)]
 #[command(name = "sigil", version, about, long_about = None)]
 struct Cli {
-    /// Text to render as a banner.
+    /// Text to render as a banner (multiple words are joined with spaces).
     #[arg(value_name = "TEXT")]
-    text: Option<String>,
+    text: Vec<String>,
 
     /// Named gradient preset (see `sigil gradients`). [default: ocean]
     #[arg(short, long)]
@@ -117,7 +117,7 @@ fn run(cli: Cli) -> Result<(), String> {
         Some(Command::Gradients) => list_gradients(base_mode(cli.no_color)),
         Some(Command::Fonts) => list_fonts(base_mode(cli.no_color)),
         None => {
-            let text = resolve_text(cli.text.as_deref())?;
+            let text = resolve_text(&cli.text)?;
             let config = Config::load()?;
             let settings = Settings::resolve(&cli, config);
             render_banner(&settings, &text)
@@ -187,12 +187,13 @@ impl Settings {
     }
 }
 
-/// Determine the banner text: the positional argument, or stdin when it is
-/// piped/redirected. Whitespace (including newlines) is collapsed to single
-/// spaces so piped input renders as one line.
-fn resolve_text(arg: Option<&str>) -> Result<String, String> {
-    if let Some(t) = arg {
-        return Ok(t.to_string());
+/// Determine the banner text: the positional arguments joined with spaces, or
+/// stdin when no arguments are given and it is piped/redirected. Whitespace
+/// (including newlines) is collapsed to single spaces so piped input renders as
+/// one line.
+fn resolve_text(args: &[String]) -> Result<String, String> {
+    if !args.is_empty() {
+        return Ok(args.join(" "));
     }
     if std::io::stdin().is_terminal() {
         return Err(
@@ -409,4 +410,15 @@ fn term_width() -> usize {
         .and_then(|v| v.parse().ok())
         .filter(|&w| w > 0)
         .unwrap_or(80)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn joins_multi_word_text() {
+        let args = vec!["Hello".to_string(), "World".to_string()];
+        assert_eq!(resolve_text(&args).unwrap(), "Hello World");
+    }
 }
