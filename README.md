@@ -107,6 +107,7 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 | `-a, --align <align>` | `left` \| `center` \| `right` | `left` |
 | `-f, --font <name>` | Font (see `sigil fonts`) | `standard` |
 | `-w, --width <cols>` | Target width for alignment | terminal width |
+| `--min-width <cols>` | Pad the banner box out to at least N columns (centered) | — |
 | `-m, --margin <n>` | Blank lines above/below | `0` |
 | `--margin-x <n>` | Left indent in columns (on top of alignment) | `0` |
 | `-F, --format <fmt>` | `term` \| `ansi` \| `raw` \| `rust` \| `go` \| `python` \| `shell` | `term` |

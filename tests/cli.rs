@@ -73,6 +73,16 @@ fn png_writes_a_valid_file() {
 }
 
 #[test]
+fn min_width_pads_the_box() {
+    let out = run(&["Hi", "-b", "round", "--min-width", "40", "-F", "raw"]);
+    assert!(out.status.success());
+    let s = String::from_utf8(out.stdout).unwrap();
+    let top = s.lines().next().unwrap();
+    // Box-drawing chars count as one char each; the box should reach 40 columns.
+    assert!(top.chars().count() >= 40);
+}
+
+#[test]
 fn version_flag_works() {
     let out = run(&["--version"]);
     assert!(out.status.success());
