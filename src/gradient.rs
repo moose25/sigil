@@ -1,33 +1,70 @@
-//! Gradients: named presets plus Oklab sampling along a set of color stops.
+//! Gradients: named presets sampled along a set of color stops, in a choice of
+//! color space (Oklab by default, or RGB / HSL).
 
-use crate::color::{Oklab, Rgb};
+use crate::color::Rgb;
 
-/// A multi-stop gradient, sampled in Oklab space.
+/// The color space a gradient blends in.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum Interp {
+    /// Perceptually-uniform Oklab (default): vivid, even blends.
+    #[default]
+    Oklab,
+    /// Straight sRGB component interpolation.
+    Rgb,
+    /// HSL — rotates hue for a rainbow-ish transition.
+    Hsl,
+}
+
+impl Interp {
+    pub fn parse(s: &str) -> Result<Interp, String> {
+        match s.to_ascii_lowercase().as_str() {
+            "oklab" | "lab" => Ok(Interp::Oklab),
+            "rgb" | "srgb" => Ok(Interp::Rgb),
+            "hsl" => Ok(Interp::Hsl),
+            _ => Err(format!("unknown interpolation: {s} (oklab|rgb|hsl)")),
+        }
+    }
+}
+
+/// A multi-stop gradient over sRGB stops, blended in a chosen [`Interp`] space.
 #[derive(Clone, Debug)]
 pub struct Gradient {
-    stops: Vec<Oklab>,
+    stops: Vec<Rgb>,
+    interp: Interp,
 }
 
 impl Gradient {
-    /// Build a gradient from two or more sRGB stops.
+    /// Build a gradient from one or more sRGB stops (Oklab blending by default).
     pub fn new(stops: &[Rgb]) -> Gradient {
         assert!(!stops.is_empty(), "gradient needs at least one stop");
         Gradient {
-            stops: stops.iter().map(|c| c.to_oklab()).collect(),
+            stops: stops.to_vec(),
+            interp: Interp::default(),
         }
+    }
+
+    /// Set the interpolation color space.
+    pub fn with_interp(mut self, interp: Interp) -> Gradient {
+        self.interp = interp;
+        self
     }
 
     /// Sample the gradient at `t` in `[0, 1]`.
     pub fn sample(&self, t: f32) -> Rgb {
         let t = t.clamp(0.0, 1.0);
         if self.stops.len() == 1 {
-            return self.stops[0].to_rgb();
+            return self.stops[0];
         }
         let segments = self.stops.len() - 1;
         let scaled = t * segments as f32;
         let idx = (scaled.floor() as usize).min(segments - 1);
         let local = scaled - idx as f32;
-        self.stops[idx].lerp(self.stops[idx + 1], local).to_rgb()
+        let (a, b) = (self.stops[idx], self.stops[idx + 1]);
+        match self.interp {
+            Interp::Oklab => a.to_oklab().lerp(b.to_oklab(), local).to_rgb(),
+            Interp::Rgb => lerp_rgb(a, b, local),
+            Interp::Hsl => lerp_hsl(a, b, local),
+        }
     }
 
     /// Look up a named preset (case-insensitive), or `None`.
@@ -147,6 +184,70 @@ fn frac(i: usize, n: usize) -> f32 {
     }
 }
 
+fn lerp8(a: u8, b: u8, t: f32) -> u8 {
+    (a as f32 + (b as f32 - a as f32) * t)
+        .round()
+        .clamp(0.0, 255.0) as u8
+}
+
+/// Straight sRGB component interpolation.
+fn lerp_rgb(a: Rgb, b: Rgb, t: f32) -> Rgb {
+    Rgb::new(lerp8(a.r, b.r, t), lerp8(a.g, b.g, t), lerp8(a.b, b.b, t))
+}
+
+/// Interpolate in HSL, taking the shortest path around the hue circle.
+fn lerp_hsl(a: Rgb, b: Rgb, t: f32) -> Rgb {
+    let (h1, s1, l1) = rgb_to_hsl(a);
+    let (h2, s2, l2) = rgb_to_hsl(b);
+    let mut dh = h2 - h1;
+    if dh > 180.0 {
+        dh -= 360.0;
+    } else if dh < -180.0 {
+        dh += 360.0;
+    }
+    let h = (h1 + dh * t).rem_euclid(360.0);
+    let s = s1 + (s2 - s1) * t;
+    let l = l1 + (l2 - l1) * t;
+    hsl_to_rgb(h, s, l)
+}
+
+fn rgb_to_hsl(c: Rgb) -> (f32, f32, f32) {
+    let (r, g, b) = (c.r as f32 / 255.0, c.g as f32 / 255.0, c.b as f32 / 255.0);
+    let max = r.max(g).max(b);
+    let min = r.min(g).min(b);
+    let l = (max + min) / 2.0;
+    let d = max - min;
+    if d.abs() < 1e-6 {
+        return (0.0, 0.0, l);
+    }
+    let s = d / (1.0 - (2.0 * l - 1.0).abs());
+    let h = if max == r {
+        60.0 * (((g - b) / d).rem_euclid(6.0))
+    } else if max == g {
+        60.0 * ((b - r) / d + 2.0)
+    } else {
+        60.0 * ((r - g) / d + 4.0)
+    };
+    (h.rem_euclid(360.0), s, l)
+}
+
+fn hsl_to_rgb(h: f32, s: f32, l: f32) -> Rgb {
+    let c = (1.0 - (2.0 * l - 1.0).abs()) * s;
+    let hp = h / 60.0;
+    let x = c * (1.0 - (hp.rem_euclid(2.0) - 1.0).abs());
+    let (r1, g1, b1) = match hp as u32 {
+        0 => (c, x, 0.0),
+        1 => (x, c, 0.0),
+        2 => (0.0, c, x),
+        3 => (0.0, x, c),
+        4 => (x, 0.0, c),
+        _ => (c, 0.0, x),
+    };
+    let m = l - c / 2.0;
+    let to8 = |v: f32| ((v + m) * 255.0).round().clamp(0.0, 255.0) as u8;
+    Rgb::new(to8(r1), to8(g1), to8(b1))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -156,6 +257,24 @@ mod tests {
         let g = Gradient::new(&[Rgb::new(255, 0, 0), Rgb::new(0, 0, 255)]);
         assert_eq!(g.sample(0.0), Rgb::new(255, 0, 0));
         assert_eq!(g.sample(1.0), Rgb::new(0, 0, 255));
+    }
+
+    #[test]
+    fn interp_modes_differ_but_share_endpoints() {
+        let stops = [Rgb::new(255, 0, 0), Rgb::new(0, 0, 255)];
+        let modes = [Interp::Oklab, Interp::Rgb, Interp::Hsl];
+        for m in modes {
+            let g = Gradient::new(&stops).with_interp(m);
+            assert_eq!(g.sample(0.0), stops[0]);
+            assert_eq!(g.sample(1.0), stops[1]);
+        }
+        // RGB midpoint is the plain average; Oklab differs.
+        let rgb = Gradient::new(&stops).with_interp(Interp::Rgb);
+        assert_eq!(rgb.sample(0.5), Rgb::new(128, 0, 128));
+        let oklab = Gradient::new(&stops).with_interp(Interp::Oklab);
+        assert_ne!(oklab.sample(0.5), rgb.sample(0.5));
+        assert_eq!(Interp::parse("hsl").unwrap(), Interp::Hsl);
+        assert!(Interp::parse("nope").is_err());
     }
 
     #[test]

@@ -8,7 +8,7 @@ use sigil::color::{ColorMode, Rgb};
 use sigil::config::Config;
 use sigil::export::{self, Format};
 use sigil::fonts;
-use sigil::gradient::{Direction, Gradient};
+use sigil::gradient::{Direction, Gradient, Interp};
 use sigil::render::{paint, Align, Banner, Border, ColorBy, RenderOptions};
 use sigil::themes::{self, Theme};
 
@@ -88,6 +88,10 @@ struct Cli {
     /// How to map the gradient: banner | line | char. [default: banner]
     #[arg(long)]
     color_by: Option<String>,
+
+    /// Gradient blend space: oklab | rgb | hsl. [default: oklab]
+    #[arg(long)]
+    interpolate: Option<String>,
 
     /// Font name (see `sigil fonts`). [default: standard]
     #[arg(short, long)]
@@ -236,6 +240,7 @@ struct Settings {
     no_color: bool,
     lines: bool,
     color_by: String,
+    interpolate: String,
     title: Option<String>,
     shadow: bool,
     shadow_color: Option<String>,
@@ -315,6 +320,7 @@ impl Settings {
             no_color: cli.no_color,
             lines: cli.lines,
             color_by: pick(&cli.color_by, None, cfg.color_by, "banner"),
+            interpolate: pick(&cli.interpolate, None, cfg.interpolate, "oklab"),
             title: cli.title.clone().or(cfg.title),
             shadow: cli.shadow || cfg.shadow.unwrap_or(false),
             shadow_color: cli.shadow_color.clone().or(cfg.shadow_color),
@@ -362,7 +368,7 @@ fn resolve_text(args: &[String], lines: bool) -> Result<String, String> {
 fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
     let format = Format::parse(&s.format)?;
     let font = fonts::load(&s.font)?;
-    let gradient = resolve_gradient(s)?;
+    let gradient = resolve_gradient(s)?.with_interp(Interp::parse(&s.interpolate)?);
     let direction = match s.angle {
         Some(deg) => Direction::Angle(deg),
         None => Direction::parse(&s.direction)?,
