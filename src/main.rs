@@ -8,7 +8,7 @@ use sigil::color::{ColorMode, Rgb};
 use sigil::export::{self, Format};
 use sigil::fonts;
 use sigil::gradient::{Direction, Gradient};
-use sigil::render::{paint, Align, Banner, RenderOptions};
+use sigil::render::{paint, Align, Banner, Border, RenderOptions};
 
 /// Give your CLI a face — modern gradient ASCII banners.
 #[derive(Parser)]
@@ -42,6 +42,18 @@ struct Cli {
     /// Repeat the gradient palette N times across the banner.
     #[arg(long, default_value_t = 1)]
     cycle: u32,
+
+    /// Frame the banner: none | round | single | double | heavy | ascii.
+    #[arg(short = 'b', long, default_value = "none")]
+    border: String,
+
+    /// Interior padding between the banner and its frame (default 1 with a border).
+    #[arg(short = 'p', long)]
+    padding: Option<usize>,
+
+    /// Solid frame color as a hex value (default: share the gradient).
+    #[arg(long, value_name = "HEX")]
+    border_color: Option<String>,
 
     /// Alignment within the terminal width: left | center | right.
     #[arg(short, long, default_value = "left")]
@@ -163,12 +175,28 @@ fn render_banner(cli: &Cli, text: &str) -> Result<(), String> {
             .map_err(|e| format!("animation error: {e}"));
     }
 
+    let border = Border::parse(&cli.border)?;
+    // Give a framed banner a little breathing room by default.
+    let padding = if border.is_some() {
+        let p = cli.padding.unwrap_or(1);
+        (p + 1, p)
+    } else {
+        let p = cli.padding.unwrap_or(0);
+        (p, p)
+    };
+    let border_color = match &cli.border_color {
+        Some(hex) => Some(Rgb::parse(hex)?),
+        None => None,
+    };
+
+    // Framed width includes the border and padding.
+    let framed_w = banner.width + 2 * padding.0 + if border.is_some() { 2 } else { 0 };
     // Only direct terminal output gets terminal-width indentation and margins;
     // snippets and raw/ansi output stay tight to the banner's own width.
     let (target_width, margin_y) = if format == Format::Term {
         (cli.width.unwrap_or_else(term_width), cli.margin)
     } else {
-        (banner.width, 0)
+        (framed_w, 0)
     };
 
     let opts = RenderOptions {
@@ -180,6 +208,9 @@ fn render_banner(cli: &Cli, text: &str) -> Result<(), String> {
         margin_y,
         reverse: cli.reverse,
         cycle: cli.cycle,
+        border,
+        padding,
+        border_color,
     };
     let painted = paint(&banner, &opts);
     let output = export::wrap(format, &painted);
@@ -286,6 +317,9 @@ fn list_fonts(mode: ColorMode) -> Result<(), String> {
             margin_y: 0,
             reverse: false,
             cycle: 1,
+            border: None,
+            padding: (0, 0),
+            border_color: None,
         };
         print!("{}", paint(&banner, &opts));
     }
