@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
-use figlet_rs::FIGfont;
 
 use sigil::color::{ColorMode, Rgb};
+use sigil::fonts;
 use sigil::gradient::{Direction, Gradient};
 use sigil::render::{paint, Align, Banner, RenderOptions};
 
@@ -30,7 +30,7 @@ struct Cli {
     #[arg(short, long, default_value = "left")]
     align: String,
 
-    /// Font name (currently: standard).
+    /// Font name (see `sigil fonts`).
     #[arg(short, long, default_value = "standard")]
     font: String,
 
@@ -75,10 +75,7 @@ fn run(cli: Cli) -> Result<(), String> {
 
     match cli.command {
         Some(Command::Gradients) => list_gradients(mode),
-        Some(Command::Fonts) => {
-            list_fonts();
-            Ok(())
-        }
+        Some(Command::Fonts) => list_fonts(mode),
         None => {
             let text = cli
                 .text
@@ -90,7 +87,7 @@ fn run(cli: Cli) -> Result<(), String> {
 }
 
 fn render_banner(cli: &Cli, text: &str, mode: ColorMode) -> Result<(), String> {
-    let font = load_font(&cli.font)?;
+    let font = fonts::load(&cli.font)?;
     let gradient = resolve_gradient(cli)?;
     let direction = Direction::parse(&cli.direction)?;
     let align = Align::parse(&cli.align)?;
@@ -125,15 +122,6 @@ fn resolve_gradient(cli: &Cli) -> Result<Gradient, String> {
         .ok_or_else(|| format!("unknown gradient: {}. See `sigil gradients`.", cli.gradient))
 }
 
-fn load_font(name: &str) -> Result<FIGfont, String> {
-    match name.to_ascii_lowercase().as_str() {
-        "standard" | "default" => FIGfont::standard(),
-        other => Err(format!(
-            "unknown font: {other}. Available: standard (more coming soon)."
-        )),
-    }
-}
-
 fn list_gradients(mode: ColorMode) -> Result<(), String> {
     println!("Built-in gradients:\n");
     for name in Gradient::preset_names() {
@@ -166,10 +154,23 @@ fn swatch(g: &Gradient, mode: ColorMode, width: usize) -> String {
     s
 }
 
-fn list_fonts() {
-    println!("Available fonts:\n");
-    println!("  standard   the classic FIGlet font (built in)");
-    println!("\nMore fonts are on the roadmap.");
+fn list_fonts(mode: ColorMode) -> Result<(), String> {
+    let gradient = Gradient::preset("ocean").unwrap();
+    for info in fonts::catalog() {
+        println!("\n\x1b[1m{}\x1b[0m — {}", info.name, info.description);
+        let font = fonts::load(info.name)?;
+        let banner = Banner::layout(&font, "Sigil")?;
+        let opts = RenderOptions {
+            gradient: gradient.clone(),
+            direction: Direction::Horizontal,
+            align: Align::Left,
+            mode,
+            target_width: 0,
+            margin_y: 0,
+        };
+        print!("{}", paint(&banner, &opts));
+    }
+    Ok(())
 }
 
 /// Best-effort terminal width; falls back to 80 columns.
