@@ -25,6 +25,7 @@ Once published to crates.io: `cargo install sigil`.
 
 ```sh
 sigil "My Project" --gradient sunset
+sigil demo                     # see a showcase of fonts, gradients, and effects
 ```
 
 ## Gallery
