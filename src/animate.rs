@@ -139,7 +139,7 @@ mod tests {
     use super::*;
     use crate::color::{ColorMode, Rgb};
     use crate::gradient::{Direction, Gradient};
-    use crate::render::{Align, Border};
+    use crate::render::{Align, Border, ColorBy};
 
     fn banner() -> Banner {
         let font = figlet_rs::FIGfont::standard().unwrap();
@@ -160,6 +160,7 @@ mod tests {
             padding: (0, 0),
             border_color: None,
             background: None,
+            color_by: ColorBy::Banner,
         }
     }
 

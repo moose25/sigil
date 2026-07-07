@@ -34,6 +34,28 @@ impl Align {
     }
 }
 
+/// How the gradient parameter is derived across the banner.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ColorBy {
+    /// One sweep across the whole banner (follows `--direction`/`--angle`).
+    Banner,
+    /// Each row runs the full gradient left→right (stacked lines each get it).
+    Line,
+    /// The palette cycles rapidly per column for a per-glyph, banded look.
+    Char,
+}
+
+impl ColorBy {
+    pub fn parse(s: &str) -> Result<ColorBy, String> {
+        match s.to_ascii_lowercase().as_str() {
+            "banner" | "all" => Ok(ColorBy::Banner),
+            "line" | "row" => Ok(ColorBy::Line),
+            "char" | "column" | "col" => Ok(ColorBy::Char),
+            _ => Err(format!("unknown color-by: {s} (banner|line|char)")),
+        }
+    }
+}
+
 /// A box-drawing style for framing a banner.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Border {
@@ -165,6 +187,8 @@ pub struct RenderOptions {
     pub border_color: Option<Rgb>,
     /// Solid background fill behind the whole box; `None` leaves it bare.
     pub background: Option<Rgb>,
+    /// How the gradient is mapped across the banner.
+    pub color_by: ColorBy,
 }
 
 /// The banner, padding, and any frame composited into a character grid.
@@ -242,7 +266,18 @@ pub fn cell_color(grid: &Grid, opts: &RenderOptions, row: usize, col: usize, pha
             return c;
         }
     }
-    let base = opts.direction.t(row, col, grid.height, grid.width);
+    let cols = grid.width;
+    let col_frac = if cols <= 1 {
+        0.0
+    } else {
+        col as f32 / (cols - 1) as f32
+    };
+    let base = match opts.color_by {
+        ColorBy::Banner => opts.direction.t(row, col, grid.height, cols),
+        ColorBy::Line => col_frac,
+        // Cycle the palette every ~6 columns for a per-glyph banded look.
+        ColorBy::Char => (col as f32 / 6.0).rem_euclid(1.0),
+    };
     let t = crate::gradient::adjust_t(base, opts.reverse, opts.cycle);
     let t = (t - phase).rem_euclid(1.0);
     opts.gradient.sample(t)
@@ -528,6 +563,7 @@ mod tests {
             padding: (0, 0),
             border_color: None,
             background: None,
+            color_by: ColorBy::Banner,
         }
     }
 
@@ -549,6 +585,32 @@ mod tests {
     #[test]
     fn xml_special_chars_escaped() {
         assert_eq!(xml_escape("a<b>&c"), "a&lt;b&gt;&amp;c");
+    }
+
+    #[test]
+    fn color_by_parses_and_bands() {
+        assert_eq!(ColorBy::parse("line").unwrap(), ColorBy::Line);
+        assert_eq!(ColorBy::parse("CHAR").unwrap(), ColorBy::Char);
+        assert!(ColorBy::parse("nope").is_err());
+
+        // Char mode repeats the palette, so a wide banner has fewer distinct
+        // colors than a smooth banner sweep.
+        let b = Banner::layout(&font(), "ABCDEFGH").unwrap();
+        let distinct = |cb: ColorBy| {
+            let mut o = base_opts(ColorMode::True);
+            o.color_by = cb;
+            let grid = compose(&b, None, (0, 0));
+            let mut set = std::collections::HashSet::new();
+            for r in 0..grid.height {
+                for c in 0..grid.width {
+                    if grid.chars[r][c] != ' ' && grid.chars[r][c] != CONT {
+                        set.insert(cell_color(&grid, &o, r, c, 0.0));
+                    }
+                }
+            }
+            set.len()
+        };
+        assert!(distinct(ColorBy::Char) < distinct(ColorBy::Banner));
     }
 
     #[test]
