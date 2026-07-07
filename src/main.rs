@@ -5,6 +5,7 @@ use clap::{Parser, Subcommand};
 
 use sigil::animate::{self, Anim};
 use sigil::color::{ColorMode, Rgb};
+use sigil::config::Config;
 use sigil::export::{self, Format};
 use sigil::fonts;
 use sigil::gradient::{Direction, Gradient};
@@ -18,18 +19,18 @@ struct Cli {
     #[arg(value_name = "TEXT")]
     text: Option<String>,
 
-    /// Named gradient preset (see `sigil gradients`).
-    #[arg(short, long, default_value = "ocean")]
-    gradient: String,
+    /// Named gradient preset (see `sigil gradients`). [default: ocean]
+    #[arg(short, long)]
+    gradient: Option<String>,
 
     /// Custom gradient as comma-separated hex stops, e.g. "#ff5f6d,#ffc371".
     /// Overrides --gradient.
     #[arg(short = 'c', long)]
     colors: Option<String>,
 
-    /// Sweep direction: horizontal | vertical | diagonal.
-    #[arg(short, long, default_value = "horizontal")]
-    direction: String,
+    /// Sweep direction: horizontal | vertical | diagonal. [default: horizontal]
+    #[arg(short, long)]
+    direction: Option<String>,
 
     /// Sweep angle in degrees (0 = left→right, 90 = top→bottom). Overrides --direction.
     #[arg(long, allow_hyphen_values = true)]
@@ -39,13 +40,13 @@ struct Cli {
     #[arg(long)]
     reverse: bool,
 
-    /// Repeat the gradient palette N times across the banner.
-    #[arg(long, default_value_t = 1)]
-    cycle: u32,
+    /// Repeat the gradient palette N times across the banner. [default: 1]
+    #[arg(long)]
+    cycle: Option<u32>,
 
-    /// Frame the banner: none | round | single | double | heavy | ascii.
-    #[arg(short = 'b', long, default_value = "none")]
-    border: String,
+    /// Frame the banner: none | round | single | double | heavy | ascii. [default: none]
+    #[arg(short = 'b', long)]
+    border: Option<String>,
 
     /// Interior padding between the banner and its frame (default 1 with a border).
     #[arg(short = 'p', long)]
@@ -55,41 +56,41 @@ struct Cli {
     #[arg(long, value_name = "HEX")]
     border_color: Option<String>,
 
-    /// Alignment within the terminal width: left | center | right.
-    #[arg(short, long, default_value = "left")]
-    align: String,
+    /// Alignment within the terminal width: left | center | right. [default: left]
+    #[arg(short, long)]
+    align: Option<String>,
 
-    /// Font name (see `sigil fonts`).
-    #[arg(short, long, default_value = "standard")]
-    font: String,
+    /// Font name (see `sigil fonts`). [default: standard]
+    #[arg(short, long)]
+    font: Option<String>,
 
     /// Target width for alignment (defaults to terminal width).
     #[arg(short = 'w', long)]
     width: Option<usize>,
 
-    /// Blank lines above and below the banner.
-    #[arg(short = 'm', long, default_value_t = 0)]
-    margin: usize,
+    /// Blank lines above and below the banner. [default: 0]
+    #[arg(short = 'm', long)]
+    margin: Option<usize>,
 
     /// Disable color output.
     #[arg(long)]
     no_color: bool,
 
-    /// Output format: term | ansi | raw | rust | go | python | shell.
-    #[arg(short = 'F', long, default_value = "term")]
-    format: String,
+    /// Output format: term | ansi | raw | rust | go | python | shell. [default: term]
+    #[arg(short = 'F', long)]
+    format: Option<String>,
 
     /// Write output to a file instead of stdout.
     #[arg(short = 'o', long, value_name = "FILE")]
     out: Option<std::path::PathBuf>,
 
-    /// Animate the reveal on a terminal: none | sweep | type.
-    #[arg(long, default_value = "none")]
-    animate: String,
+    /// Animate the reveal on a terminal: none | sweep | type. [default: none]
+    #[arg(long)]
+    animate: Option<String>,
 
-    /// Animation speed in frames per second (1-120).
-    #[arg(long, default_value_t = 30)]
-    fps: u32,
+    /// Animation speed in frames per second (1-120). [default: 30]
+    #[arg(long)]
+    fps: Option<u32>,
 
     #[command(subcommand)]
     command: Option<Command>,
@@ -112,18 +113,76 @@ fn main() {
 }
 
 fn run(cli: Cli) -> Result<(), String> {
-    let mode = if cli.no_color {
+    match cli.command {
+        Some(Command::Gradients) => list_gradients(base_mode(cli.no_color)),
+        Some(Command::Fonts) => list_fonts(base_mode(cli.no_color)),
+        None => {
+            let text = resolve_text(cli.text.as_deref())?;
+            let config = Config::load()?;
+            let settings = Settings::resolve(&cli, config);
+            render_banner(&settings, &text)
+        }
+    }
+}
+
+fn base_mode(no_color: bool) -> ColorMode {
+    if no_color {
         ColorMode::None
     } else {
         ColorMode::detect()
-    };
+    }
+}
 
-    match cli.command {
-        Some(Command::Gradients) => list_gradients(mode),
-        Some(Command::Fonts) => list_fonts(mode),
-        None => {
-            let text = resolve_text(cli.text.as_deref())?;
-            render_banner(&cli, &text)
+/// Effective options after merging CLI flags over config files over built-in
+/// defaults (flag > project config > user config > default).
+struct Settings {
+    gradient: String,
+    colors: Option<String>,
+    font: String,
+    direction: String,
+    align: String,
+    angle: Option<f32>,
+    reverse: bool,
+    cycle: u32,
+    border: String,
+    padding: Option<usize>,
+    border_color: Option<String>,
+    margin: usize,
+    width: Option<usize>,
+    format: String,
+    out: Option<std::path::PathBuf>,
+    animate: String,
+    fps: u32,
+    no_color: bool,
+}
+
+impl Settings {
+    fn resolve(cli: &Cli, cfg: Config) -> Settings {
+        // A CLI flag wins; otherwise the config value; otherwise `default`.
+        let pick = |flag: &Option<String>, from_cfg: Option<String>, default: &str| {
+            flag.clone()
+                .or(from_cfg)
+                .unwrap_or_else(|| default.to_string())
+        };
+        Settings {
+            gradient: pick(&cli.gradient, cfg.gradient, "ocean"),
+            colors: cli.colors.clone().or(cfg.colors),
+            font: pick(&cli.font, cfg.font, "standard"),
+            direction: pick(&cli.direction, cfg.direction, "horizontal"),
+            align: pick(&cli.align, cfg.align, "left"),
+            angle: cli.angle.or(cfg.angle),
+            reverse: cli.reverse || cfg.reverse.unwrap_or(false),
+            cycle: cli.cycle.or(cfg.cycle).unwrap_or(1),
+            border: pick(&cli.border, cfg.border, "none"),
+            padding: cli.padding.or(cfg.padding),
+            border_color: cli.border_color.clone().or(cfg.border_color),
+            margin: cli.margin.or(cfg.margin).unwrap_or(0),
+            width: cli.width.or(cfg.width),
+            format: pick(&cli.format, cfg.format, "term"),
+            out: cli.out.clone(),
+            animate: pick(&cli.animate, cfg.animate, "none"),
+            fps: cli.fps.or(cfg.fps).unwrap_or(30),
+            no_color: cli.no_color,
         }
     }
 }
@@ -151,40 +210,40 @@ fn resolve_text(arg: Option<&str>) -> Result<String, String> {
     Ok(text)
 }
 
-fn render_banner(cli: &Cli, text: &str) -> Result<(), String> {
-    let format = Format::parse(&cli.format)?;
-    let font = fonts::load(&cli.font)?;
-    let gradient = resolve_gradient(cli)?;
-    let direction = match cli.angle {
+fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
+    let format = Format::parse(&s.format)?;
+    let font = fonts::load(&s.font)?;
+    let gradient = resolve_gradient(s)?;
+    let direction = match s.angle {
         Some(deg) => Direction::Angle(deg),
-        None => Direction::parse(&cli.direction)?,
+        None => Direction::parse(&s.direction)?,
     };
-    let align = Align::parse(&cli.align)?;
+    let align = Align::parse(&s.align)?;
     let banner = Banner::layout(&font, text)?;
-    let mode = color_mode(cli, format);
-    let anim = Anim::parse(&cli.animate)?;
+    let mode = color_mode(s, format);
+    let anim = Anim::parse(&s.animate)?;
 
     // Animate only for live terminal output; snippets/files/pipes render static.
     if anim.is_animated()
         && format == Format::Term
-        && cli.out.is_none()
+        && s.out.is_none()
         && std::io::stdout().is_terminal()
     {
         let mut out = std::io::stdout().lock();
-        return animate::play(&mut out, &banner, &gradient, mode, anim, cli.fps)
+        return animate::play(&mut out, &banner, &gradient, mode, anim, s.fps)
             .map_err(|e| format!("animation error: {e}"));
     }
 
-    let border = Border::parse(&cli.border)?;
+    let border = Border::parse(&s.border)?;
     // Give a framed banner a little breathing room by default.
     let padding = if border.is_some() {
-        let p = cli.padding.unwrap_or(1);
+        let p = s.padding.unwrap_or(1);
         (p + 1, p)
     } else {
-        let p = cli.padding.unwrap_or(0);
+        let p = s.padding.unwrap_or(0);
         (p, p)
     };
-    let border_color = match &cli.border_color {
+    let border_color = match &s.border_color {
         Some(hex) => Some(Rgb::parse(hex)?),
         None => None,
     };
@@ -194,7 +253,7 @@ fn render_banner(cli: &Cli, text: &str) -> Result<(), String> {
     // Only direct terminal output gets terminal-width indentation and margins;
     // snippets and raw/ansi output stay tight to the banner's own width.
     let (target_width, margin_y) = if format == Format::Term {
-        (cli.width.unwrap_or_else(term_width), cli.margin)
+        (s.width.unwrap_or_else(term_width), s.margin)
     } else {
         (framed_w, 0)
     };
@@ -206,23 +265,23 @@ fn render_banner(cli: &Cli, text: &str) -> Result<(), String> {
         mode,
         target_width,
         margin_y,
-        reverse: cli.reverse,
-        cycle: cli.cycle,
+        reverse: s.reverse,
+        cycle: s.cycle,
         border,
         padding,
         border_color,
     };
     let painted = paint(&banner, &opts);
     let output = export::wrap(format, &painted);
-    write_output(cli.out.as_deref(), &output)
+    write_output(s.out.as_deref(), &output)
 }
 
 /// Decide the color mode for a render, given the format and where output goes.
 ///
 /// `--no-color`/`NO_COLOR` always win. Snippet and `ansi` formats bake color
 /// in. Plain terminal output uses color only when writing to an actual TTY.
-fn color_mode(cli: &Cli, format: Format) -> ColorMode {
-    if cli.no_color || std::env::var_os("NO_COLOR").is_some() {
+fn color_mode(s: &Settings, format: Format) -> ColorMode {
+    if s.no_color || std::env::var_os("NO_COLOR").is_some() {
         return ColorMode::None;
     }
     if format == Format::Raw {
@@ -232,7 +291,7 @@ fn color_mode(cli: &Cli, format: Format) -> ColorMode {
         return ColorMode::supported();
     }
     // Format::Term: color only on a real terminal (not piped, not a file).
-    if cli.out.is_none() && std::io::stdout().is_terminal() {
+    if s.out.is_none() && std::io::stdout().is_terminal() {
         ColorMode::supported()
     } else {
         ColorMode::None
@@ -255,19 +314,19 @@ fn write_output(path: Option<&Path>, content: &str) -> Result<(), String> {
 }
 
 /// Build the gradient from --colors (if given) or the named --gradient preset.
-fn resolve_gradient(cli: &Cli) -> Result<Gradient, String> {
-    if let Some(list) = &cli.colors {
+fn resolve_gradient(s: &Settings) -> Result<Gradient, String> {
+    if let Some(list) = &s.colors {
         let stops = list
             .split(',')
-            .map(|s| Rgb::parse(s.trim()))
+            .map(|c| Rgb::parse(c.trim()))
             .collect::<Result<Vec<_>, _>>()?;
         if stops.is_empty() {
             return Err("--colors needs at least one hex stop".into());
         }
         return Ok(Gradient::new(&stops));
     }
-    Gradient::preset(&cli.gradient)
-        .ok_or_else(|| format!("unknown gradient: {}. See `sigil gradients`.", cli.gradient))
+    Gradient::preset(&s.gradient)
+        .ok_or_else(|| format!("unknown gradient: {}. See `sigil gradients`.", s.gradient))
 }
 
 fn list_gradients(mode: ColorMode) -> Result<(), String> {
