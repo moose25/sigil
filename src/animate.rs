@@ -50,13 +50,7 @@ pub fn play(
 ) -> io::Result<()> {
     let fps = fps.clamp(1, 120);
     let delay = Duration::from_secs_f32(1.0 / fps as f32);
-    let grid = compose(
-        banner,
-        opts.border,
-        opts.padding,
-        opts.shadow.is_some(),
-        opts.title.as_deref(),
-    );
+    let grid = compose(banner, opts);
     let height = grid.height;
 
     match style {
@@ -168,6 +162,7 @@ mod tests {
             background: None,
             color_by: ColorBy::Banner,
             shadow: None,
+            outline: None,
             title: None,
         }
     }
@@ -184,13 +179,7 @@ mod tests {
     fn type_reveal_is_progressive() {
         let b = banner();
         let o = opts(ColorMode::None, None);
-        let grid = compose(
-            &b,
-            o.border,
-            o.padding,
-            o.shadow.is_some(),
-            o.title.as_deref(),
-        );
+        let grid = compose(&b, &o);
         let none = frame(&grid, &o, 0.0, Some(0));
         let full = frame(&grid, &o, 0.0, Some(grid.width));
         assert!(none.chars().all(|c| c == ' ' || c == '\n'));
@@ -201,13 +190,7 @@ mod tests {
     fn frame_line_count_and_color() {
         let b = banner();
         let o = opts(ColorMode::True, None);
-        let grid = compose(
-            &b,
-            o.border,
-            o.padding,
-            o.shadow.is_some(),
-            o.title.as_deref(),
-        );
+        let grid = compose(&b, &o);
         let f = frame(&grid, &o, 0.25, None);
         assert_eq!(f.lines().count(), grid.height);
         assert!(f.contains("\x1b[38;2;"));
@@ -217,13 +200,7 @@ mod tests {
     fn border_shows_during_animation() {
         let b = banner();
         let o = opts(ColorMode::None, Border::parse("round").unwrap());
-        let grid = compose(
-            &b,
-            o.border,
-            o.padding,
-            o.shadow.is_some(),
-            o.title.as_deref(),
-        );
+        let grid = compose(&b, &o);
         // A mid-reveal frame should already include the top-left corner.
         let f = frame(&grid, &o, 0.0, Some(1));
         assert!(f.contains('╭'));

@@ -191,6 +191,8 @@ pub struct RenderOptions {
     pub color_by: ColorBy,
     /// Drop-shadow color behind the glyphs; `None` disables the shadow.
     pub shadow: Option<Rgb>,
+    /// Outline (halo) color around the glyphs; `None` disables the outline.
+    pub outline: Option<Rgb>,
     /// Caption embedded in the top border (only shown when a border is set).
     pub title: Option<String>,
 }
@@ -204,6 +206,7 @@ pub struct Grid {
     pub chars: Vec<Vec<char>>,
     pub is_frame: Vec<Vec<bool>>,
     pub is_shadow: Vec<Vec<bool>>,
+    pub is_outline: Vec<Vec<bool>>,
     pub width: usize,
     pub height: usize,
 }
@@ -211,45 +214,49 @@ pub struct Grid {
 /// Drop-shadow offset (columns, rows) — down and to the right.
 const SHADOW: (usize, usize) = (1, 1);
 
-/// Composite a banner (with padding, optional frame, optional shadow) into a
-/// [`Grid`].
-pub fn compose(
-    banner: &Banner,
-    border: Option<Border>,
-    padding: (usize, usize),
-    shadow: bool,
-    title: Option<&str>,
-) -> Grid {
-    let (px, py) = padding;
-    let edge = if border.is_some() { 1 } else { 0 };
-    let (sdx, sdy) = if shadow { SHADOW } else { (0, 0) };
-    let width = banner.width + sdx + 2 * px + 2 * edge;
-    let height = banner.height() + sdy + 2 * py + 2 * edge;
-    let (ox, oy) = (edge + px, edge + py);
+/// Composite a banner (with padding, frame, shadow, outline, title) into a
+/// [`Grid`], ready for coloring.
+pub fn compose(banner: &Banner, opts: &RenderOptions) -> Grid {
+    let (px, py) = opts.padding;
+    let edge = if opts.border.is_some() { 1 } else { 0 };
+    let (sdx, sdy) = if opts.shadow.is_some() {
+        SHADOW
+    } else {
+        (0, 0)
+    };
+    let om = usize::from(opts.outline.is_some()); // 1-cell halo margin on every side
+    let width = banner.width + 2 * om + sdx + 2 * px + 2 * edge;
+    let height = banner.height() + 2 * om + sdy + 2 * py + 2 * edge;
+    let (ox, oy) = (edge + px + om, edge + py + om);
 
     let mut chars = vec![vec![' '; width]; height];
     let mut is_frame = vec![vec![false; width]; height];
     let mut is_shadow = vec![vec![false; width]; height];
+    let mut is_outline = vec![vec![false; width]; height];
 
-    // Place a banner's glyphs at (base_row, base_col); `shadow` marks the layer.
-    let place = |chars: &mut Vec<Vec<char>>,
-                 is_shadow: &mut Vec<Vec<bool>>,
-                 bx: usize,
+    // Stamp the banner's glyphs at base (by, bx) into `flag`. `only_empty`
+    // leaves already-occupied cells alone (used for the outline halo).
+    let stamp = |chars: &mut Vec<Vec<char>>,
+                 flag: &mut Vec<Vec<bool>>,
                  by: usize,
-                 mark_shadow: bool| {
+                 bx: usize,
+                 only_empty: bool| {
         for (r, line) in banner.lines.iter().enumerate() {
             let mut col = bx;
             for ch in line.chars() {
                 let w = UnicodeWidthChar::width(ch).unwrap_or(0);
-                if w == 0 || col >= width {
+                if w == 0 {
                     continue;
                 }
-                if ch != ' ' {
+                if col >= width {
+                    break;
+                }
+                if ch != ' ' && (!only_empty || chars[by + r][col] == ' ') {
                     chars[by + r][col] = ch;
-                    is_shadow[by + r][col] = mark_shadow;
+                    flag[by + r][col] = true;
                     if w == 2 && col + 1 < width {
                         chars[by + r][col + 1] = CONT;
-                        is_shadow[by + r][col + 1] = mark_shadow;
+                        flag[by + r][col + 1] = true;
                     }
                 }
                 col += w;
@@ -257,21 +264,51 @@ pub fn compose(
         }
     };
 
-    // Shadow first (offset), then the main glyphs overwrite where they overlap.
-    if shadow {
-        place(&mut chars, &mut is_shadow, ox + sdx, oy + sdy, true);
+    // Layers, back to front: shadow (offset), outline (8-way halo), main glyphs.
+    if opts.shadow.is_some() {
+        stamp(&mut chars, &mut is_shadow, oy + sdy, ox + sdx, false);
     }
-    place(&mut chars, &mut is_shadow, ox, oy, false);
+    if opts.outline.is_some() {
+        for dr in -1_isize..=1 {
+            for dc in -1_isize..=1 {
+                if dr == 0 && dc == 0 {
+                    continue;
+                }
+                let by = (oy as isize + dr) as usize;
+                let bx = (ox as isize + dc) as usize;
+                stamp(&mut chars, &mut is_outline, by, bx, true);
+            }
+        }
+    }
+    // Main glyphs on top, clearing any shadow/outline flags they cover.
+    for (r, line) in banner.lines.iter().enumerate() {
+        let mut col = ox;
+        for ch in line.chars() {
+            let w = UnicodeWidthChar::width(ch).unwrap_or(0);
+            if w == 0 {
+                continue;
+            }
+            if col >= width {
+                break;
+            }
+            if ch != ' ' {
+                for c in col..(col + w).min(width) {
+                    chars[oy + r][c] = if c == col { ch } else { CONT };
+                    is_shadow[oy + r][c] = false;
+                    is_outline[oy + r][c] = false;
+                }
+            }
+            col += w;
+        }
+    }
 
-    if let Some(b) = border {
+    if let Some(b) = opts.border {
         let (top, bot, left, right) = (0, height - 1, 0, width - 1);
         for col in 0..width {
             chars[top][col] = b.h;
             chars[bot][col] = b.h;
             is_frame[top][col] = true;
             is_frame[bot][col] = true;
-            is_shadow[top][col] = false;
-            is_shadow[bot][col] = false;
         }
         for row in chars.iter_mut() {
             row[left] = b.v;
@@ -281,9 +318,17 @@ pub fn compose(
             r[left] = true;
             r[right] = true;
         }
-        for r in is_shadow.iter_mut() {
-            r[left] = false;
-            r[right] = false;
+        // Frame cells are never shadow/outline.
+        for (fr, (sr, or)) in is_frame
+            .iter()
+            .zip(is_shadow.iter_mut().zip(is_outline.iter_mut()))
+        {
+            for (c, &f) in fr.iter().enumerate() {
+                if f {
+                    sr[c] = false;
+                    or[c] = false;
+                }
+            }
         }
         chars[top][left] = b.tl;
         chars[top][right] = b.tr;
@@ -291,7 +336,7 @@ pub fn compose(
         chars[bot][right] = b.br;
 
         // Embed a title into the top border: `╭─ title ─────╮`.
-        if let Some(t) = title.filter(|t| !t.is_empty()) {
+        if let Some(t) = opts.title.as_deref().filter(|t| !t.is_empty()) {
             let deco: Vec<char> = format!(" {t} ").chars().collect();
             let start = 2; // after the corner and one horizontal rule
             let room = width.saturating_sub(start + 2); // keep a rule + corner on the right
@@ -304,6 +349,7 @@ pub fn compose(
         chars,
         is_frame,
         is_shadow,
+        is_outline,
         width,
         height,
     }
@@ -312,6 +358,11 @@ pub fn compose(
 /// The color of the non-space cell at (row, col), honoring a solid frame color,
 /// the gradient direction, reverse/cycle, and an animation `phase` shift.
 pub fn cell_color(grid: &Grid, opts: &RenderOptions, row: usize, col: usize, phase: f32) -> Rgb {
+    if let Some(oc) = opts.outline {
+        if grid.is_outline[row][col] {
+            return oc;
+        }
+    }
     if let Some(sc) = opts.shadow {
         if grid.is_shadow[row][col] {
             return sc;
@@ -341,13 +392,7 @@ pub fn cell_color(grid: &Grid, opts: &RenderOptions, row: usize, col: usize, pha
 
 /// Paint `banner` into a printable string with ANSI color escapes.
 pub fn paint(banner: &Banner, opts: &RenderOptions) -> String {
-    let grid = compose(
-        banner,
-        opts.border,
-        opts.padding,
-        opts.shadow.is_some(),
-        opts.title.as_deref(),
-    );
+    let grid = compose(banner, opts);
 
     let slack = opts.target_width.saturating_sub(grid.width);
     let indent = match opts.align {
@@ -421,13 +466,7 @@ fn svg_impl(
     background: Option<Rgb>,
     animate: bool,
 ) -> String {
-    let grid = compose(
-        banner,
-        opts.border,
-        opts.padding,
-        opts.shadow.is_some(),
-        opts.title.as_deref(),
-    );
+    let grid = compose(banner, opts);
     let font_size = 24.0_f32;
     let cell_w = font_size * 0.6; // monospace advance width
     let line_h = font_size * 1.2;
@@ -529,13 +568,7 @@ fn push_animated_span(
 /// Render the banner as a standalone HTML document: a `<pre>` of colored
 /// `<span>`s, for embedding in web pages, docs, or HTML email.
 pub fn to_html(banner: &Banner, opts: &RenderOptions, background: Option<Rgb>) -> String {
-    let grid = compose(
-        banner,
-        opts.border,
-        opts.padding,
-        opts.shadow.is_some(),
-        opts.title.as_deref(),
-    );
+    let grid = compose(banner, opts);
     let bg = background.unwrap_or(Rgb::new(13, 17, 23));
 
     let mut s = String::new();
@@ -639,6 +672,7 @@ mod tests {
             background: None,
             color_by: ColorBy::Banner,
             shadow: None,
+            outline: None,
             title: None,
         }
     }
@@ -675,7 +709,7 @@ mod tests {
         let distinct = |cb: ColorBy| {
             let mut o = base_opts(ColorMode::True);
             o.color_by = cb;
-            let grid = compose(&b, None, (0, 0), false, None);
+            let grid = compose(&b, &o);
             let mut set = std::collections::HashSet::new();
             for r in 0..grid.height {
                 for c in 0..grid.width {
@@ -728,8 +762,10 @@ mod tests {
             lines: vec!["A".to_string()],
             width: 1,
         };
-        let plain = compose(&banner, None, (0, 0), false, None);
-        let shad = compose(&banner, None, (0, 0), true, None);
+        let plain = compose(&banner, &base_opts(ColorMode::None));
+        let mut o = base_opts(ColorMode::None);
+        o.shadow = Some(Rgb::new(20, 20, 20));
+        let shad = compose(&banner, &o);
         // Shadow adds one column and one row.
         assert_eq!(shad.width, plain.width + 1);
         assert_eq!(shad.height, plain.height + 1);
@@ -739,12 +775,28 @@ mod tests {
     }
 
     #[test]
+    fn outline_haloes_the_glyphs() {
+        let banner = Banner {
+            lines: vec!["A".to_string()],
+            width: 1,
+        };
+        let plain = compose(&banner, &base_opts(ColorMode::None));
+        let mut o = base_opts(ColorMode::None);
+        o.outline = Some(Rgb::new(200, 200, 200));
+        let out = compose(&banner, &o);
+        // Outline adds a 1-cell halo on every side.
+        assert_eq!(out.width, plain.width + 2);
+        assert_eq!(out.height, plain.height + 2);
+        assert!(out.is_outline.iter().any(|row| row.iter().any(|&s| s)));
+    }
+
+    #[test]
     fn wide_glyphs_align_by_display_width() {
         let banner = Banner {
             lines: vec!["日x".to_string(), "ab".to_string()],
             width: 3, // 日(2) + x(1)
         };
-        let g = compose(&banner, None, (0, 0), false, None);
+        let g = compose(&banner, &base_opts(ColorMode::None));
         assert_eq!(g.width, 3);
         assert_eq!(g.chars[0][0], '日');
         assert_eq!(g.chars[0][1], CONT);
