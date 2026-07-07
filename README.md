@@ -34,6 +34,8 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 | `-f, --font <name>` | Font (see `sigil fonts`) | `standard` |
 | `-w, --width <cols>` | Target width for alignment | terminal width |
 | `-m, --margin <n>` | Blank lines above/below | `0` |
+| `-F, --format <fmt>` | `term` \| `ansi` \| `raw` \| `rust` \| `go` \| `python` \| `shell` | `term` |
+| `-o, --out <file>` | Write to a file instead of stdout | — |
 | `--no-color` | Disable color | — |
 
 ### Gradients
@@ -44,13 +46,27 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 
 `standard`, `ansishadow`, `slant`, `big`, `small` (with aliases like `shadow`, `italic`, `mini`). Run `sigil fonts` for a live preview. Bundled fonts are embedded in the binary — see [src/fonts/NOTICE.md](src/fonts/NOTICE.md) for attribution.
 
+## Embed in your own tool
+
+Generate a banner once and paste it into your project — a splash for `--help`, a startup logo, a script header. `--format` emits ready-to-use output:
+
+```sh
+sigil "Acme" -g sunset -F rust   > src/banner.rs   # pub const BANNER: &str = ...
+sigil "Acme" -g sunset -F go     > banner.go        # const Banner = ...
+sigil "Acme" -g sunset -F python > banner.py        # BANNER = ...
+sigil "Acme" -g sunset -F shell  > banner.sh        # cat <<'…' heredoc that prints it
+sigil "Acme" -g sunset -F ansi   > banner.ansi      # raw colored ANSI bytes
+```
+
+The `rust`/`go`/`python` snippets define a `BANNER` constant (with a comment showing how to print it); `shell` is a runnable heredoc. Color is baked into every snippet format. Use `-o <file>` instead of a shell redirect if you prefer.
+
 ## Color support
 
 `sigil` emits 24-bit truecolor when `COLORTERM` advertises it, falls back to the 256-color palette otherwise, and prints plain glyphs under `NO_COLOR` or `--no-color`.
 
 ## Roadmap
 
-Tracked in [issues](../../issues): animated reveals, an `export`/embed helper for dropping banners into your own tools, config files, borders, custom fonts, packaging, and docs.
+Tracked in [issues](../../issues): animated reveals, config files, borders, custom fonts, gradient angles, stdin input, packaging, and docs.
 
 ## License
 
