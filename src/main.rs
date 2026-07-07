@@ -149,6 +149,15 @@ enum Command {
     Fonts,
     /// List available themes.
     Themes,
+    /// Write a starter config file (or print it with --print).
+    Init {
+        /// Overwrite an existing config file.
+        #[arg(long)]
+        force: bool,
+        /// Print the starter config to stdout instead of writing a file.
+        #[arg(long)]
+        print: bool,
+    },
     /// Print a shell completion script (bash|zsh|fish|powershell|elvish).
     Completions {
         #[arg(value_name = "SHELL")]
@@ -174,6 +183,7 @@ fn run(cli: Cli) -> Result<(), String> {
             list_themes(&Config::load()?);
             Ok(())
         }
+        Some(Command::Init { force, print }) => init_config(force, print),
         Some(Command::Completions { shell }) => {
             print_completions(shell);
             Ok(())
@@ -656,6 +666,30 @@ fn print_man() -> Result<(), String> {
     std::io::stdout()
         .write_all(&buf)
         .map_err(|e| format!("failed to write man page: {e}"))
+}
+
+/// Write (or print) the starter config file.
+fn init_config(force: bool, print: bool) -> Result<(), String> {
+    if print {
+        print!("{}", sigil::config::STARTER);
+        return Ok(());
+    }
+    let path = sigil::config::user_config_path()
+        .ok_or("cannot determine a config directory (set HOME or XDG_CONFIG_HOME)")?;
+    if path.exists() && !force {
+        return Err(format!(
+            "{} already exists; use --force to overwrite (or --print)",
+            path.display()
+        ));
+    }
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)
+            .map_err(|e| format!("cannot create {}: {e}", dir.display()))?;
+    }
+    std::fs::write(&path, sigil::config::STARTER)
+        .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
+    eprintln!("wrote {}", path.display());
+    Ok(())
 }
 
 fn list_themes(cfg: &Config) {

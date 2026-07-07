@@ -159,7 +159,7 @@ brand   = ["#0f2027", "#203a43", "#2c5364"]
 sunset2 = ["#ff9966", "#ff5e62"]
 ```
 
-Unknown keys are rejected so typos surface early. Your gradients show up in `sigil gradients`.
+Unknown keys are rejected so typos surface early. Your gradients show up in `sigil gradients`. Run `sigil init` to drop a commented starter config in place (`--print` to preview, `--force` to overwrite).
 
 ## Color support
 
