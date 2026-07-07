@@ -118,6 +118,10 @@ struct Cli {
     #[arg(short = 'w', long)]
     width: Option<usize>,
 
+    /// Pad the banner box out to at least N columns (content centered).
+    #[arg(long)]
+    min_width: Option<usize>,
+
     /// Blank lines above and below the banner. [default: 0]
     #[arg(short = 'm', long)]
     margin: Option<usize>,
@@ -271,6 +275,7 @@ struct Settings {
     background: Option<String>,
     margin: usize,
     margin_x: usize,
+    min_width: Option<usize>,
     width: Option<usize>,
     format: String,
     out: Option<std::path::PathBuf>,
@@ -356,6 +361,7 @@ impl Settings {
                 .or(cfg.background),
             margin: cli.margin.or(cfg.margin).unwrap_or(0),
             margin_x: cli.margin_x.or(cfg.margin_x).unwrap_or(0),
+            min_width: cli.min_width.or(cfg.min_width),
             width: cli.width.or(cfg.width),
             format: pick(&cli.format, None, cfg.format, "term"),
             out: cli.out.clone(),
@@ -428,7 +434,7 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         None => Direction::parse(&s.direction)?,
     };
     let align = Align::parse(&s.align)?;
-    let banner = if let Some(path) = &s.art {
+    let mut banner = if let Some(path) = &s.art {
         Banner::from_art(&read_art(path)?)
     } else if s.lines {
         let parts: Vec<&str> = text
@@ -460,6 +466,21 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         py = y;
     }
     let padding = (px, py);
+
+    // Pad the banner content out so the whole box reaches --min-width (centered).
+    if let Some(mw) = s.min_width {
+        let edge = if border.is_some() { 1 } else { 0 };
+        let box_w = banner.width + 2 * px + 2 * edge;
+        if mw > box_w {
+            let extra = mw - box_w;
+            let (left, right) = (extra / 2, extra - extra / 2);
+            for line in &mut banner.lines {
+                *line = format!("{}{}{}", " ".repeat(left), line, " ".repeat(right));
+            }
+            banner.width += extra;
+        }
+    }
+
     let border_color = match &s.border_color {
         Some(hex) => Some(Rgb::parse(hex)?),
         None => None,
