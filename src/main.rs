@@ -61,6 +61,10 @@ struct Cli {
     #[arg(long, visible_alias = "bg", value_name = "HEX")]
     background: Option<String>,
 
+    /// Caption to embed in the top border (needs a border).
+    #[arg(long, value_name = "TEXT")]
+    title: Option<String>,
+
     /// Draw a drop shadow behind the glyphs.
     #[arg(long)]
     shadow: bool,
@@ -210,6 +214,7 @@ struct Settings {
     no_color: bool,
     lines: bool,
     color_by: String,
+    title: Option<String>,
     shadow: bool,
     shadow_color: Option<String>,
     user_gradients: std::collections::HashMap<String, Vec<String>>,
@@ -285,6 +290,7 @@ impl Settings {
             no_color: cli.no_color,
             lines: cli.lines,
             color_by: pick(&cli.color_by, None, cfg.color_by, "banner"),
+            title: cli.title.clone().or(cfg.title),
             shadow: cli.shadow || cfg.shadow.unwrap_or(false),
             shadow_color: cli.shadow_color.clone().or(cfg.shadow_color),
             user_gradients: cfg.gradients,
@@ -399,6 +405,7 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         background,
         color_by,
         shadow,
+        title: s.title.clone(),
     };
 
     // SVG/HTML are rendered directly from the grid, not from painted ANSI.
@@ -583,6 +590,7 @@ fn preview_font(
         background: None,
         color_by: ColorBy::Banner,
         shadow: None,
+        title: None,
     };
     print!("{}", paint(&banner, &opts));
     Ok(())

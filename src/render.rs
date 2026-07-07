@@ -191,6 +191,8 @@ pub struct RenderOptions {
     pub color_by: ColorBy,
     /// Drop-shadow color behind the glyphs; `None` disables the shadow.
     pub shadow: Option<Rgb>,
+    /// Caption embedded in the top border (only shown when a border is set).
+    pub title: Option<String>,
 }
 
 /// The banner, padding, and any frame composited into a character grid.
@@ -216,6 +218,7 @@ pub fn compose(
     border: Option<Border>,
     padding: (usize, usize),
     shadow: bool,
+    title: Option<&str>,
 ) -> Grid {
     let (px, py) = padding;
     let edge = if border.is_some() { 1 } else { 0 };
@@ -286,6 +289,16 @@ pub fn compose(
         chars[top][right] = b.tr;
         chars[bot][left] = b.bl;
         chars[bot][right] = b.br;
+
+        // Embed a title into the top border: `╭─ title ─────╮`.
+        if let Some(t) = title.filter(|t| !t.is_empty()) {
+            let deco: Vec<char> = format!(" {t} ").chars().collect();
+            let start = 2; // after the corner and one horizontal rule
+            let room = width.saturating_sub(start + 2); // keep a rule + corner on the right
+            for (i, ch) in deco.into_iter().take(room).enumerate() {
+                chars[top][start + i] = ch;
+            }
+        }
     }
     Grid {
         chars,
@@ -328,7 +341,13 @@ pub fn cell_color(grid: &Grid, opts: &RenderOptions, row: usize, col: usize, pha
 
 /// Paint `banner` into a printable string with ANSI color escapes.
 pub fn paint(banner: &Banner, opts: &RenderOptions) -> String {
-    let grid = compose(banner, opts.border, opts.padding, opts.shadow.is_some());
+    let grid = compose(
+        banner,
+        opts.border,
+        opts.padding,
+        opts.shadow.is_some(),
+        opts.title.as_deref(),
+    );
 
     let slack = opts.target_width.saturating_sub(grid.width);
     let indent = match opts.align {
@@ -402,7 +421,13 @@ fn svg_impl(
     background: Option<Rgb>,
     animate: bool,
 ) -> String {
-    let grid = compose(banner, opts.border, opts.padding, opts.shadow.is_some());
+    let grid = compose(
+        banner,
+        opts.border,
+        opts.padding,
+        opts.shadow.is_some(),
+        opts.title.as_deref(),
+    );
     let font_size = 24.0_f32;
     let cell_w = font_size * 0.6; // monospace advance width
     let line_h = font_size * 1.2;
@@ -504,7 +529,13 @@ fn push_animated_span(
 /// Render the banner as a standalone HTML document: a `<pre>` of colored
 /// `<span>`s, for embedding in web pages, docs, or HTML email.
 pub fn to_html(banner: &Banner, opts: &RenderOptions, background: Option<Rgb>) -> String {
-    let grid = compose(banner, opts.border, opts.padding, opts.shadow.is_some());
+    let grid = compose(
+        banner,
+        opts.border,
+        opts.padding,
+        opts.shadow.is_some(),
+        opts.title.as_deref(),
+    );
     let bg = background.unwrap_or(Rgb::new(13, 17, 23));
 
     let mut s = String::new();
@@ -608,6 +639,7 @@ mod tests {
             background: None,
             color_by: ColorBy::Banner,
             shadow: None,
+            title: None,
         }
     }
 
@@ -643,7 +675,7 @@ mod tests {
         let distinct = |cb: ColorBy| {
             let mut o = base_opts(ColorMode::True);
             o.color_by = cb;
-            let grid = compose(&b, None, (0, 0), false);
+            let grid = compose(&b, None, (0, 0), false, None);
             let mut set = std::collections::HashSet::new();
             for r in 0..grid.height {
                 for c in 0..grid.width {
@@ -679,13 +711,25 @@ mod tests {
     }
 
     #[test]
+    fn title_embeds_in_top_border() {
+        let b = Banner::layout(&font(), "Hi").unwrap();
+        let mut opts = base_opts(ColorMode::None);
+        opts.border = Border::parse("round").unwrap();
+        opts.padding = (2, 1);
+        opts.title = Some("hey".to_string());
+        let top = paint(&b, &opts).lines().next().unwrap().to_string();
+        assert!(top.contains("hey"));
+        assert!(top.starts_with('╭') && top.ends_with('╮'));
+    }
+
+    #[test]
     fn shadow_grows_grid_and_marks_cells() {
         let banner = Banner {
             lines: vec!["A".to_string()],
             width: 1,
         };
-        let plain = compose(&banner, None, (0, 0), false);
-        let shad = compose(&banner, None, (0, 0), true);
+        let plain = compose(&banner, None, (0, 0), false, None);
+        let shad = compose(&banner, None, (0, 0), true, None);
         // Shadow adds one column and one row.
         assert_eq!(shad.width, plain.width + 1);
         assert_eq!(shad.height, plain.height + 1);
@@ -700,7 +744,7 @@ mod tests {
             lines: vec!["日x".to_string(), "ab".to_string()],
             width: 3, // 日(2) + x(1)
         };
-        let g = compose(&banner, None, (0, 0), false);
+        let g = compose(&banner, None, (0, 0), false, None);
         assert_eq!(g.width, 3);
         assert_eq!(g.chars[0][0], '日');
         assert_eq!(g.chars[0][1], CONT);
