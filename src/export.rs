@@ -25,6 +25,8 @@ pub enum Format {
     Svg,
     /// A standalone HTML document (a `<pre>` of colored spans).
     Html,
+    /// A PNG raster image.
+    Png,
 }
 
 impl Format {
@@ -39,8 +41,9 @@ impl Format {
             "shell" | "sh" | "bash" => Ok(Format::Shell),
             "svg" => Ok(Format::Svg),
             "html" | "htm" => Ok(Format::Html),
+            "png" => Ok(Format::Png),
             _ => Err(format!(
-                "unknown format: {s} (term|ansi|raw|rust|go|python|shell|svg|html)"
+                "unknown format: {s} (term|ansi|raw|rust|go|python|shell|svg|html|png)"
             )),
         }
     }
@@ -66,8 +69,8 @@ impl Format {
 /// (`Term`, `Ansi`, `Raw`) the painted string is returned unchanged.
 pub fn wrap(format: Format, painted: &str) -> String {
     match format {
-        // Svg/Html are rendered separately (not from painted ANSI); fallback.
-        Format::Term | Format::Ansi | Format::Raw | Format::Svg | Format::Html => {
+        // Svg/Html/Png are rendered separately (not from painted ANSI); fallback.
+        Format::Term | Format::Ansi | Format::Raw | Format::Svg | Format::Html | Format::Png => {
             painted.to_string()
         }
         Format::Rust => format!(

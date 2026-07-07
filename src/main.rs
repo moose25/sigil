@@ -442,6 +442,10 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         let html = sigil::render::to_html(&banner, &opts, background);
         return write_output(s.out.as_deref(), &html);
     }
+    if format == Format::Png {
+        let bytes = sigil::render::to_png(&banner, &opts, background)?;
+        return write_bytes(s.out.as_deref(), &bytes);
+    }
 
     // Animate only for live terminal output; snippets/files/pipes render static.
     if anim.is_animated()
@@ -478,6 +482,24 @@ fn color_mode(s: &Settings, format: Format) -> ColorMode {
         ColorMode::supported()
     } else {
         ColorMode::None
+    }
+}
+
+/// Write binary output (e.g. PNG) to a file, or to stdout when piped. Refuses
+/// to dump binary onto a terminal.
+fn write_bytes(path: Option<&Path>, bytes: &[u8]) -> Result<(), String> {
+    match path {
+        Some(p) => {
+            std::fs::write(p, bytes).map_err(|e| format!("cannot write {}: {e}", p.display()))?;
+            eprintln!("wrote {}", p.display());
+            Ok(())
+        }
+        None if std::io::stdout().is_terminal() => {
+            Err("refusing to write binary to a terminal; use -o <file> or redirect".into())
+        }
+        None => std::io::stdout()
+            .write_all(bytes)
+            .map_err(|e| format!("cannot write output: {e}")),
     }
 }
 
