@@ -27,18 +27,57 @@ impl Interp {
 }
 
 /// A multi-stop gradient over sRGB stops, blended in a chosen [`Interp`] space.
+///
+/// `positions` holds each stop's location in `[0, 1]`, ascending; for an evenly
+/// spaced gradient they are `0, 1/(n-1), … 1`, but callers can supply custom
+/// positions to bias the blend.
 #[derive(Clone, Debug)]
 pub struct Gradient {
     stops: Vec<Rgb>,
+    positions: Vec<f32>,
     interp: Interp,
 }
 
 impl Gradient {
-    /// Build a gradient from one or more sRGB stops (Oklab blending by default).
+    /// Build a gradient from one or more evenly spaced sRGB stops (Oklab
+    /// blending by default).
     pub fn new(stops: &[Rgb]) -> Gradient {
         assert!(!stops.is_empty(), "gradient needs at least one stop");
+        let n = stops.len();
+        let positions = (0..n)
+            .map(|i| {
+                if n == 1 {
+                    0.0
+                } else {
+                    i as f32 / (n - 1) as f32
+                }
+            })
+            .collect();
         Gradient {
             stops: stops.to_vec(),
+            positions,
+            interp: Interp::default(),
+        }
+    }
+
+    /// Build a gradient from stops at explicit positions in `[0, 1]`.
+    ///
+    /// Positions are sorted with their stops, so callers need not pre-sort. Must
+    /// be the same length as `stops` and non-empty.
+    pub fn with_positions(stops: &[Rgb], positions: &[f32]) -> Gradient {
+        assert!(
+            !stops.is_empty() && stops.len() == positions.len(),
+            "positioned gradient needs matching, non-empty stops and positions"
+        );
+        let mut pairs: Vec<(f32, Rgb)> = positions
+            .iter()
+            .map(|p| p.clamp(0.0, 1.0))
+            .zip(stops.iter().copied())
+            .collect();
+        pairs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+        Gradient {
+            stops: pairs.iter().map(|(_, c)| *c).collect(),
+            positions: pairs.iter().map(|(p, _)| *p).collect(),
             interp: Interp::default(),
         }
     }
@@ -55,10 +94,17 @@ impl Gradient {
         if self.stops.len() == 1 {
             return self.stops[0];
         }
-        let segments = self.stops.len() - 1;
-        let scaled = t * segments as f32;
-        let idx = (scaled.floor() as usize).min(segments - 1);
-        let local = scaled - idx as f32;
+        // Find the segment whose position range contains `t`.
+        let mut idx = 0;
+        while idx + 2 < self.stops.len() && t > self.positions[idx + 1] {
+            idx += 1;
+        }
+        let (p0, p1) = (self.positions[idx], self.positions[idx + 1]);
+        let local = if (p1 - p0).abs() < 1e-6 {
+            0.0
+        } else {
+            ((t - p0) / (p1 - p0)).clamp(0.0, 1.0)
+        };
         let (a, b) = (self.stops[idx], self.stops[idx + 1]);
         match self.interp {
             Interp::Oklab => a.to_oklab().lerp(b.to_oklab(), local).to_rgb(),
@@ -315,6 +361,33 @@ mod tests {
             assert!(Gradient::preset(name).is_some(), "missing preset {name}");
         }
         assert!(Gradient::preset("nonsense").is_none());
+    }
+
+    #[test]
+    fn positioned_stops_bias_the_blend() {
+        let black = Rgb::new(0, 0, 0);
+        let white = Rgb::new(255, 255, 255);
+        // White doesn't start until t=0.8, so t=0.5 is still solid black.
+        let g = Gradient::with_positions(&[black, white], &[0.8, 1.0]).with_interp(Interp::Rgb);
+        assert_eq!(g.sample(0.0), black);
+        assert_eq!(g.sample(0.5), black);
+        // ~90% of the way, i.e. about halfway through the 0.8–1.0 segment: mid-gray.
+        let mid = g.sample(0.9);
+        assert!(
+            (mid.r as i16 - 128).abs() <= 2,
+            "expected ~mid-gray, got {mid:?}"
+        );
+        assert_eq!(g.sample(1.0), white);
+    }
+
+    #[test]
+    fn with_positions_sorts_unordered_input() {
+        let a = Rgb::new(10, 0, 0);
+        let b = Rgb::new(0, 0, 10);
+        // Positions given out of order are sorted with their stops.
+        let g = Gradient::with_positions(&[a, b], &[1.0, 0.0]);
+        assert_eq!(g.sample(0.0), b);
+        assert_eq!(g.sample(1.0), a);
     }
 
     #[test]

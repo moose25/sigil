@@ -743,15 +743,54 @@ fn resolve_gradient(s: &Settings) -> Result<Gradient, String> {
 }
 
 /// Parse a list of hex color stops into a gradient.
+///
+/// Each stop is a hex color with an optional `@position` in `[0, 1]`
+/// (e.g. `#000@0`, `#fff@0.8`). If any stop is positioned, unpositioned ones
+/// fall back to their evenly-spaced default position.
 fn parse_stops(stops: &[String]) -> Result<Gradient, String> {
-    let colors = stops
-        .iter()
-        .map(|c| Rgb::parse(c.trim()))
-        .collect::<Result<Vec<_>, _>>()?;
+    let mut colors: Vec<Rgb> = Vec::new();
+    let mut positions: Vec<Option<f32>> = Vec::new();
+    for raw in stops {
+        let s = raw.trim();
+        if s.is_empty() {
+            continue;
+        }
+        let (hex, pos) = match s.split_once('@') {
+            Some((h, p)) => {
+                let v: f32 = p
+                    .trim()
+                    .parse()
+                    .map_err(|_| format!("invalid stop position: {p:?} (want 0-1)"))?;
+                if !(0.0..=1.0).contains(&v) {
+                    return Err(format!("stop position out of range (0-1): {v}"));
+                }
+                (h, Some(v))
+            }
+            None => (s, None),
+        };
+        colors.push(Rgb::parse(hex.trim())?);
+        positions.push(pos);
+    }
     if colors.is_empty() {
         return Err("needs at least one hex stop".into());
     }
-    Ok(Gradient::new(&colors))
+    if positions.iter().any(Option::is_some) {
+        let n = colors.len();
+        let filled: Vec<f32> = positions
+            .iter()
+            .enumerate()
+            .map(|(i, p)| {
+                p.unwrap_or(if n == 1 {
+                    0.0
+                } else {
+                    i as f32 / (n - 1) as f32
+                })
+            })
+            .collect();
+        Ok(Gradient::with_positions(&colors, &filled))
+    } else {
+        Ok(Gradient::new(&colors))
+    }
 }
 
 fn list_gradients(mode: ColorMode, cfg: &Config) -> Result<(), String> {
