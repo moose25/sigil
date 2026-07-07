@@ -160,6 +160,42 @@ impl Banner {
         Ok(Banner { lines, width })
     }
 
+    /// Word-wrap `text` so each rendered line fits within `max_width` display
+    /// columns, then stack the wrapped lines like [`Banner::layout_multi`].
+    ///
+    /// Words are kept whole and packed greedily; a single word that renders
+    /// wider than `max_width` still gets its own line (we never split a word
+    /// mid-glyph). Wrapping is measured against the *rendered* banner width, so
+    /// it accounts for the font — not the raw character count.
+    pub fn layout_wrapped(font: &FIGfont, text: &str, max_width: usize) -> Result<Banner, String> {
+        let words: Vec<&str> = text.split_whitespace().collect();
+        if words.is_empty() {
+            return Banner::layout(font, "");
+        }
+        let mut lines: Vec<String> = Vec::new();
+        let mut current = String::new();
+        for word in words {
+            let candidate = if current.is_empty() {
+                word.to_string()
+            } else {
+                format!("{current} {word}")
+            };
+            // Keep the word on this line if it still fits, or if the line is
+            // empty (an oversized lone word has nowhere else to go).
+            if current.is_empty() || Banner::layout(font, &candidate)?.width <= max_width {
+                current = candidate;
+            } else {
+                lines.push(std::mem::take(&mut current));
+                current = word.to_string();
+            }
+        }
+        if !current.is_empty() {
+            lines.push(current);
+        }
+        let refs: Vec<&str> = lines.iter().map(String::as_str).collect();
+        Banner::layout_multi(font, &refs)
+    }
+
     /// Build a banner from existing multi-line art (not a FIGlet font): keep the
     /// characters as-is and pad to a common display width.
     pub fn from_art(content: &str) -> Banner {
@@ -787,6 +823,28 @@ mod tests {
             outline: None,
             title: None,
         }
+    }
+
+    #[test]
+    fn wrap_breaks_long_text_within_width() {
+        let f = font();
+        let full = Banner::layout(&f, "wrap this long title please").unwrap();
+        let limit = full.width / 2;
+        let wrapped = Banner::layout_wrapped(&f, "wrap this long title please", limit).unwrap();
+        // Wrapping produced a taller, narrower banner than the single line.
+        assert!(wrapped.height() > full.height());
+        assert!(wrapped.width <= full.width);
+    }
+
+    #[test]
+    fn wrap_keeps_oversized_word_on_its_own_line() {
+        let f = font();
+        // A width of 1 forces every word onto its own line, even though each
+        // single word is far wider than the limit.
+        let wrapped = Banner::layout_wrapped(&f, "alpha beta gamma", 1).unwrap();
+        let one = Banner::layout(&f, "alpha").unwrap();
+        // Three words → three stacked banners (plus blank separator rows).
+        assert!(wrapped.height() >= one.height() * 3);
     }
 
     #[test]
