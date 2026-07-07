@@ -121,7 +121,7 @@ fn main() {
 
 fn run(cli: Cli) -> Result<(), String> {
     match cli.command {
-        Some(Command::Gradients) => list_gradients(base_mode(cli.no_color)),
+        Some(Command::Gradients) => list_gradients(base_mode(cli.no_color), &Config::load()?),
         Some(Command::Fonts) => list_fonts(base_mode(cli.no_color)),
         Some(Command::Completions { shell }) => {
             print_completions(shell);
@@ -168,6 +168,7 @@ struct Settings {
     animate: String,
     fps: u32,
     no_color: bool,
+    user_gradients: std::collections::HashMap<String, Vec<String>>,
 }
 
 impl Settings {
@@ -197,6 +198,7 @@ impl Settings {
             animate: pick(&cli.animate, cfg.animate, "none"),
             fps: cli.fps.or(cfg.fps).unwrap_or(30),
             no_color: cli.no_color,
+            user_gradients: cfg.gradients,
         }
     }
 }
@@ -329,30 +331,49 @@ fn write_output(path: Option<&Path>, content: &str) -> Result<(), String> {
     }
 }
 
-/// Build the gradient from --colors (if given) or the named --gradient preset.
+/// Build the gradient from --colors, a user-defined gradient, or a built-in
+/// preset (in that order of precedence).
 fn resolve_gradient(s: &Settings) -> Result<Gradient, String> {
     if let Some(list) = &s.colors {
-        let stops = list
-            .split(',')
-            .map(|c| Rgb::parse(c.trim()))
-            .collect::<Result<Vec<_>, _>>()?;
-        if stops.is_empty() {
-            return Err("--colors needs at least one hex stop".into());
-        }
-        return Ok(Gradient::new(&stops));
+        return parse_stops(&list.split(',').map(str::to_string).collect::<Vec<_>>())
+            .map_err(|e| format!("--colors: {e}"));
+    }
+    if let Some(stops) = s.user_gradients.get(&s.gradient) {
+        return parse_stops(stops).map_err(|e| format!("gradient {:?}: {e}", s.gradient));
     }
     Gradient::preset(&s.gradient)
         .ok_or_else(|| format!("unknown gradient: {}. See `sigil gradients`.", s.gradient))
 }
 
-fn list_gradients(mode: ColorMode) -> Result<(), String> {
+/// Parse a list of hex color stops into a gradient.
+fn parse_stops(stops: &[String]) -> Result<Gradient, String> {
+    let colors = stops
+        .iter()
+        .map(|c| Rgb::parse(c.trim()))
+        .collect::<Result<Vec<_>, _>>()?;
+    if colors.is_empty() {
+        return Err("needs at least one hex stop".into());
+    }
+    Ok(Gradient::new(&colors))
+}
+
+fn list_gradients(mode: ColorMode, cfg: &Config) -> Result<(), String> {
     println!("Built-in gradients:\n");
     for name in Gradient::preset_names() {
         let g = Gradient::preset(name).unwrap();
-        let bar = swatch(&g, mode, 24);
-        println!("  {bar}  {name}");
+        println!("  {}  {name}", swatch(&g, mode, 24));
     }
-    println!("\nCustom: --colors \"#ff5f6d,#ffc371\"");
+    if !cfg.gradients.is_empty() {
+        println!("\nYour gradients (from config):\n");
+        let mut names: Vec<&String> = cfg.gradients.keys().collect();
+        names.sort();
+        for name in names {
+            let g =
+                parse_stops(&cfg.gradients[name]).map_err(|e| format!("gradient {name:?}: {e}"))?;
+            println!("  {}  {name}", swatch(&g, mode, 24));
+        }
+    }
+    println!("\nCustom on the fly: --colors \"#ff5f6d,#ffc371\"");
     Ok(())
 }
 

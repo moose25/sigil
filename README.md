@@ -126,9 +126,14 @@ align = "center"
 border = "round"
 # any of: colors, direction, angle, reverse, cycle, padding,
 # border_color, margin, width, animate, fps, format
+
+# Define your own named gradients and use them like built-ins (-g brand):
+[gradients]
+brand   = ["#0f2027", "#203a43", "#2c5364"]
+sunset2 = ["#ff9966", "#ff5e62"]
 ```
 
-Unknown keys are rejected so typos surface early.
+Unknown keys are rejected so typos surface early. Your gradients show up in `sigil gradients`.
 
 ## Color support
 

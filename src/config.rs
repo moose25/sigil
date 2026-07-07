@@ -6,6 +6,7 @@
 //!
 //! Command-line flags then override both. Every field is optional.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
@@ -31,6 +32,8 @@ pub struct Config {
     pub animate: Option<String>,
     pub fps: Option<u32>,
     pub format: Option<String>,
+    /// User-defined named gradients: name -> list of hex stops.
+    pub gradients: HashMap<String, Vec<String>>,
 }
 
 impl Config {
@@ -83,6 +86,10 @@ impl Config {
             fps,
             format,
         );
+        // Named gradients merge per-key (project entries override user entries).
+        for (name, stops) in other.gradients {
+            self.gradients.insert(name, stops);
+        }
     }
 }
 
@@ -110,6 +117,16 @@ mod tests {
     #[test]
     fn rejects_unknown_fields() {
         assert!(toml::from_str::<Config>("wobble = true\n").is_err());
+    }
+
+    #[test]
+    fn parses_custom_gradients() {
+        let cfg: Config =
+            toml::from_str("[gradients]\nbrand = [\"#0f2027\", \"#2c5364\"]\n").unwrap();
+        assert_eq!(
+            cfg.gradients.get("brand").map(Vec::as_slice),
+            Some(["#0f2027".to_string(), "#2c5364".to_string()].as_slice())
+        );
     }
 
     #[test]
