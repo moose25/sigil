@@ -87,7 +87,14 @@ pub fn play(
 /// `reveal`, when set, hides every column at or past it (typewriter).
 fn frame(grid: &Grid, opts: &RenderOptions, phase: f32, reveal: Option<usize>) -> String {
     let mut out = String::new();
+    let bg = opts
+        .background
+        .filter(|_| opts.mode != crate::color::ColorMode::None)
+        .map(|c| opts.mode.bg(c));
     for row in 0..grid.height {
+        if let Some(bg) = &bg {
+            out.push_str(bg);
+        }
         let mut last = None;
         for col in 0..grid.width {
             let hidden = reveal.is_some_and(|r| col >= r);
@@ -152,6 +159,7 @@ mod tests {
             border,
             padding: (0, 0),
             border_color: None,
+            background: None,
         }
     }
 

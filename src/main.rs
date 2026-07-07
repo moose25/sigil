@@ -56,6 +56,10 @@ struct Cli {
     #[arg(long, value_name = "HEX")]
     border_color: Option<String>,
 
+    /// Solid background fill behind the banner, as a hex value.
+    #[arg(long, visible_alias = "bg", value_name = "HEX")]
+    background: Option<String>,
+
     /// Alignment within the terminal width: left | center | right. [default: left]
     #[arg(short, long)]
     align: Option<String>,
@@ -173,6 +177,7 @@ struct Settings {
     border: String,
     padding: Option<usize>,
     border_color: Option<String>,
+    background: Option<String>,
     margin: usize,
     width: Option<usize>,
     format: String,
@@ -219,6 +224,7 @@ impl Settings {
             border: pick(&cli.border, cfg.border, "none"),
             padding: cli.padding.or(cfg.padding),
             border_color: cli.border_color.clone().or(cfg.border_color),
+            background: cli.background.clone().or(cfg.background),
             margin: cli.margin.or(cfg.margin).unwrap_or(0),
             width: cli.width.or(cfg.width),
             format: pick(&cli.format, cfg.format, "term"),
@@ -300,6 +306,10 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         Some(hex) => Some(Rgb::parse(hex)?),
         None => None,
     };
+    let background = match &s.background {
+        Some(hex) => Some(Rgb::parse(hex)?),
+        None => None,
+    };
 
     // Framed width includes the border and padding.
     let framed_w = banner.width + 2 * padding.0 + if border.is_some() { 2 } else { 0 };
@@ -323,11 +333,12 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         border,
         padding,
         border_color,
+        background,
     };
 
     // SVG is rendered directly from the grid, not from painted ANSI.
     if format == Format::Svg {
-        let svg = sigil::render::to_svg(&banner, &opts, None);
+        let svg = sigil::render::to_svg(&banner, &opts, background);
         return write_output(s.out.as_deref(), &svg);
     }
 
@@ -496,6 +507,7 @@ fn preview_font(
         border: None,
         padding: (0, 0),
         border_color: None,
+        background: None,
     };
     print!("{}", paint(&banner, &opts));
     Ok(())
