@@ -130,15 +130,38 @@ pub const STARTER: &str = "\
 # sigil config — https://github.com/moose25/sigil
 # Every option is optional; CLI flags override these. Uncomment to use.
 
-# gradient = \"vaporwave\"     # a preset, or define one under [gradients]
-# font     = \"ansishadow\"
-# align    = \"center\"
-# border   = \"round\"
-# padding  = 1
+# --- color ---
+# gradient    = \"vaporwave\"      # a preset, or define one under [gradients]
+# colors      = \"#ff5f6d,#ffc371\" # custom stops (overrides gradient)
+# interpolate = \"oklab\"          # oklab | rgb | hsl
+# color_by    = \"banner\"         # banner | line | char
+# direction   = \"horizontal\"     # horizontal | vertical | diagonal
+# angle       = 45                # degrees (overrides direction)
+# reverse     = false
+# cycle       = 1                 # repeat the palette N times
+
+# --- font & layout ---
+# font    = \"ansishadow\"
+# align   = \"center\"             # left | center | right
+# margin  = 0                     # blank lines above/below
+# width   = 80                    # alignment width (default: terminal)
+
+# --- frame & effects ---
+# border       = \"round\"         # none | round | single | double | heavy | ascii
+# padding      = 1
+# border_color = \"#8a2be2\"
+# title        = \"my project\"    # caption in the top border
 # background   = \"#0d1117\"
-# color_by = \"banner\"        # banner | line | char
-# shadow   = false
-# outline  = false
+# shadow       = false
+# shadow_color = \"#1c1c22\"
+# outline      = false
+# outline_color = \"#0a0a0c\"
+
+# --- output ---
+# format  = \"term\"              # term | ansi | raw | rust | go | python | shell | svg | html | png | json
+# animate = \"none\"              # none | sweep | type | pulse | scroll
+# fps     = 30
+# scale   = 1                    # PNG resolution multiplier (1-10)
 
 # Your own named gradients — use with `-g brand`:
 # [gradients]
@@ -149,6 +172,7 @@ pub const STARTER: &str = "\
 # font = \"slant\"
 # gradient = \"gold\"
 # border = \"double\"
+# shadow = true
 ";
 
 #[cfg(test)]
