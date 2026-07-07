@@ -4,7 +4,15 @@ All notable changes to sigil are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased] — 0.1.0
+## [0.2.0] — 2026-07-07
+
+### Added
+
+- Independent interior padding: `--pad-x` / `--pad-y` (override `--padding` per axis).
+- Horizontal margin: `--margin-x` (left indent, complements the vertical `--margin`).
+- Minimum width: `--min-width` pads the box out to at least N columns (centered).
+
+## [0.1.0] — 2026-07-07
 
 The initial release. Built up across seven development milestones.
 

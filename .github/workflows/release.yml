@@ -11,7 +11,18 @@ permissions:
   contents: write
 
 jobs:
+  # Create the GitHub Release first so the binary jobs have somewhere to upload.
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/create-gh-release-action@v1
+        with:
+          title: "sigil $tag"
+          token: ${{ secrets.GITHUB_TOKEN }}
+
   binaries:
+    needs: create-release
     name: ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     strategy:
