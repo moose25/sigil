@@ -114,6 +114,30 @@ impl Banner {
         Ok(Banner { lines, width })
     }
 
+    /// Render several texts as separate banners stacked vertically (a blank row
+    /// between each) into one banner, padded to a common display width. The
+    /// result is a single unit: gradients, borders, and animation span it all.
+    pub fn layout_multi(font: &FIGfont, texts: &[&str]) -> Result<Banner, String> {
+        let mut lines: Vec<String> = Vec::new();
+        for (i, text) in texts.iter().enumerate() {
+            if i > 0 {
+                lines.push(String::new());
+            }
+            lines.extend(Banner::layout(font, text)?.lines);
+        }
+        if lines.is_empty() {
+            lines.push(String::new());
+        }
+        let width = lines.iter().map(|l| display_width(l)).max().unwrap_or(0);
+        for l in &mut lines {
+            let pad = width - display_width(l);
+            if pad > 0 {
+                l.push_str(&" ".repeat(pad));
+            }
+        }
+        Ok(Banner { lines, width })
+    }
+
     pub fn height(&self) -> usize {
         self.lines.len()
     }
