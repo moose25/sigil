@@ -111,7 +111,11 @@ sigil "Acme" -g sunset -F go     > banner.go        # const Banner = ...
 sigil "Acme" -g sunset -F python > banner.py        # BANNER = ...
 sigil "Acme" -g sunset -F shell  > banner.sh        # cat <<'…' heredoc that prints it
 sigil "Acme" -g sunset -F ansi   > banner.ansi      # raw colored ANSI bytes
+sigil "Acme" -g sunset -F svg    > banner.svg        # standalone SVG image
 ```
+
+`-F svg` produces a self-contained SVG (colored monospace grid on a dark
+backdrop) — drop it straight into a README or docs.
 
 The `rust`/`go`/`python` snippets define a `BANNER` constant (with a comment showing how to print it); `shell` is a runnable heredoc. Color is baked into every snippet format. Use `-o <file>` instead of a shell redirect if you prefer.
 
