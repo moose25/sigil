@@ -117,6 +117,10 @@ struct Cli {
     #[arg(short = 'o', long, value_name = "FILE")]
     out: Option<std::path::PathBuf>,
 
+    /// PNG scale factor (1-10), for higher-resolution -F png output. [default: 1]
+    #[arg(long)]
+    scale: Option<usize>,
+
     /// Animate the reveal on a terminal: none | sweep | type. [default: none]
     #[arg(long)]
     animate: Option<String>,
@@ -237,6 +241,7 @@ struct Settings {
     shadow_color: Option<String>,
     outline: bool,
     outline_color: Option<String>,
+    scale: usize,
     user_gradients: std::collections::HashMap<String, Vec<String>>,
 }
 
@@ -315,6 +320,7 @@ impl Settings {
             shadow_color: cli.shadow_color.clone().or(cfg.shadow_color),
             outline: cli.outline || cfg.outline.unwrap_or(false),
             outline_color: cli.outline_color.clone().or(cfg.outline_color),
+            scale: cli.scale.or(cfg.scale).unwrap_or(1),
             user_gradients: cfg.gradients,
         })
     }
@@ -453,7 +459,7 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         return write_output(s.out.as_deref(), &html);
     }
     if format == Format::Png {
-        let bytes = sigil::render::to_png(&banner, &opts, background)?;
+        let bytes = sigil::render::to_png(&banner, &opts, background, s.scale)?;
         return write_bytes(s.out.as_deref(), &bytes);
     }
 

@@ -572,13 +572,15 @@ pub fn to_png(
     banner: &Banner,
     opts: &RenderOptions,
     background: Option<Rgb>,
+    scale: usize,
 ) -> Result<Vec<u8>, String> {
-    // Cell size in pixels, roughly a terminal cell's 1:2 aspect.
-    const CW: usize = 14;
-    const CH: usize = 28;
+    // Cell size in pixels, roughly a terminal cell's 1:2 aspect, times `scale`.
+    let scale = scale.clamp(1, 10);
+    let cw = 14 * scale;
+    let ch = 28 * scale;
     let grid = compose(banner, opts);
-    let w = grid.width * CW;
-    let h = grid.height * CH;
+    let w = grid.width * cw;
+    let h = grid.height * ch;
     if w == 0 || h == 0 {
         return Err("nothing to render".into());
     }
@@ -590,9 +592,9 @@ pub fn to_png(
         px.extend_from_slice(&[bg.r, bg.g, bg.b]);
     }
     let mut fill = |x0: usize, y0: usize, c: Rgb| {
-        for y in y0..y0 + CH {
+        for y in y0..y0 + ch {
             let base = (y * w + x0) * 3;
-            for x in 0..CW {
+            for x in 0..cw {
                 let i = base + x * 3;
                 px[i] = c.r;
                 px[i + 1] = c.g;
@@ -606,7 +608,7 @@ pub fn to_png(
                 continue; // leave the background showing
             }
             let c = cell_color(&grid, opts, row, col, 0.0);
-            fill(col * CW, row * CH, c);
+            fill(col * cw, row * ch, c);
         }
     }
 
@@ -784,7 +786,7 @@ mod tests {
     #[test]
     fn png_has_valid_signature() {
         let b = Banner::layout(&font(), "Hi").unwrap();
-        let bytes = to_png(&b, &base_opts(ColorMode::True), None).unwrap();
+        let bytes = to_png(&b, &base_opts(ColorMode::True), None, 1).unwrap();
         // PNG magic number.
         assert_eq!(
             &bytes[..8],
