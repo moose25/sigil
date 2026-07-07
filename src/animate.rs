@@ -4,14 +4,15 @@
 //! in place by moving the cursor back up over the banner and repainting, so no
 //! alternate screen or raw mode is needed — and nothing to restore if the user
 //! hits Ctrl-C.
+//!
+//! Frames reuse [`crate::render`]'s grid and per-cell coloring, so borders,
+//! gradient direction, and reverse/cycle all animate for free.
 
 use std::io::{self, Write};
 use std::thread::sleep;
 use std::time::Duration;
 
-use crate::color::ColorMode;
-use crate::gradient::Gradient;
-use crate::render::Banner;
+use crate::render::{cell_color, compose, Banner, Grid, RenderOptions};
 
 /// A reveal style.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -43,18 +44,18 @@ impl Anim {
 pub fn play(
     out: &mut impl Write,
     banner: &Banner,
-    gradient: &Gradient,
-    mode: ColorMode,
+    opts: &RenderOptions,
     style: Anim,
     fps: u32,
 ) -> io::Result<()> {
     let fps = fps.clamp(1, 120);
     let delay = Duration::from_secs_f32(1.0 / fps as f32);
-    let height = banner.height();
+    let grid = compose(banner, opts.border, opts.padding);
+    let height = grid.height;
 
     match style {
         Anim::None => {
-            out.write_all(sweep_frame(banner, gradient, mode, 0.0).as_bytes())?;
+            out.write_all(frame(&grid, opts, 0.0, None).as_bytes())?;
         }
         Anim::Sweep => {
             // Scroll the gradient for ~2 seconds (one cycle per second), then
@@ -62,26 +63,16 @@ pub fn play(
             let frames = fps as usize * 2;
             for i in 0..frames {
                 let phase = i as f32 / fps as f32;
-                draw(
-                    out,
-                    &sweep_frame(banner, gradient, mode, phase),
-                    height,
-                    i == 0,
-                )?;
+                draw(out, &frame(&grid, opts, phase, None), height, i == 0)?;
                 sleep(delay);
             }
-            draw(
-                out,
-                &sweep_frame(banner, gradient, mode, 0.0),
-                height,
-                false,
-            )?;
+            draw(out, &frame(&grid, opts, 0.0, None), height, false)?;
         }
         Anim::Type => {
-            for reveal in 0..=banner.width {
+            for reveal in 0..=grid.width {
                 draw(
                     out,
-                    &type_frame(banner, gradient, mode, reveal),
+                    &frame(&grid, opts, 0.0, Some(reveal)),
                     height,
                     reveal == 0,
                 )?;
@@ -90,6 +81,32 @@ pub fn play(
         }
     }
     Ok(())
+}
+
+/// Render one frame of the grid: `phase` shifts the gradient (sweep), and
+/// `reveal`, when set, hides every column at or past it (typewriter).
+fn frame(grid: &Grid, opts: &RenderOptions, phase: f32, reveal: Option<usize>) -> String {
+    let mut out = String::new();
+    for row in 0..grid.height {
+        let mut last = None;
+        for col in 0..grid.width {
+            let hidden = reveal.is_some_and(|r| col >= r);
+            let ch = grid.chars[row][col];
+            if ch == ' ' || hidden {
+                out.push(' ');
+                continue;
+            }
+            let color = cell_color(grid, opts, row, col, phase);
+            if opts.mode != crate::color::ColorMode::None && last != Some(color) {
+                out.push_str(&opts.mode.fg(color));
+                last = Some(color);
+            }
+            out.push(ch);
+        }
+        out.push_str(opts.mode.reset());
+        out.push('\n');
+    }
+    out
 }
 
 /// Write one frame, repositioning over the previous one when not the first.
@@ -103,76 +120,32 @@ fn draw(out: &mut impl Write, content: &str, height: usize, first: bool) -> io::
     out.flush()
 }
 
-/// Horizontal gradient position of a column, in `[0, 1]`.
-fn column_t(col: usize, cols: usize) -> f32 {
-    if cols <= 1 {
-        0.0
-    } else {
-        col as f32 / (cols - 1) as f32
-    }
-}
-
-/// A sweep frame: the horizontal gradient shifted by `phase` and wrapped.
-fn sweep_frame(banner: &Banner, gradient: &Gradient, mode: ColorMode, phase: f32) -> String {
-    let cols = banner.width;
-    let mut out = String::new();
-    for line in &banner.lines {
-        let mut last = None;
-        for (c, ch) in line.chars().enumerate() {
-            if ch == ' ' {
-                out.push(' ');
-                continue;
-            }
-            let t = (column_t(c, cols) - phase).rem_euclid(1.0);
-            let color = gradient.sample(t);
-            if mode != ColorMode::None && last != Some(color) {
-                out.push_str(&mode.fg(color));
-                last = Some(color);
-            }
-            out.push(ch);
-        }
-        out.push_str(mode.reset());
-        out.push('\n');
-    }
-    out
-}
-
-/// A typewriter frame: static gradient, revealing columns `0..reveal`.
-fn type_frame(banner: &Banner, gradient: &Gradient, mode: ColorMode, reveal: usize) -> String {
-    let cols = banner.width;
-    let mut out = String::new();
-    for line in &banner.lines {
-        let mut last = None;
-        for (c, ch) in line.chars().enumerate() {
-            if c >= reveal || ch == ' ' {
-                out.push(' ');
-                continue;
-            }
-            let color = gradient.sample(column_t(c, cols));
-            if mode != ColorMode::None && last != Some(color) {
-                out.push_str(&mode.fg(color));
-                last = Some(color);
-            }
-            out.push(ch);
-        }
-        out.push_str(mode.reset());
-        out.push('\n');
-    }
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::color::Rgb;
+    use crate::color::{ColorMode, Rgb};
+    use crate::gradient::{Direction, Gradient};
+    use crate::render::{Align, Border};
 
     fn banner() -> Banner {
         let font = figlet_rs::FIGfont::standard().unwrap();
         Banner::layout(&font, "Hi").unwrap()
     }
 
-    fn grad() -> Gradient {
-        Gradient::new(&[Rgb::new(255, 0, 0), Rgb::new(0, 0, 255)])
+    fn opts(mode: ColorMode, border: Option<Border>) -> RenderOptions {
+        RenderOptions {
+            gradient: Gradient::new(&[Rgb::new(255, 0, 0), Rgb::new(0, 0, 255)]),
+            direction: Direction::Horizontal,
+            align: Align::Left,
+            mode,
+            target_width: 0,
+            margin_y: 0,
+            reverse: false,
+            cycle: 1,
+            border,
+            padding: (0, 0),
+            border_color: None,
+        }
     }
 
     #[test]
@@ -184,21 +157,33 @@ mod tests {
     }
 
     #[test]
-    fn type_frame_reveals_progressively() {
+    fn type_reveal_is_progressive() {
         let b = banner();
-        let none = type_frame(&b, &grad(), ColorMode::None, 0);
-        let full = type_frame(&b, &grad(), ColorMode::None, b.width);
-        // Nothing revealed yet: only spaces/newlines.
+        let o = opts(ColorMode::None, None);
+        let grid = compose(&b, o.border, o.padding);
+        let none = frame(&grid, &o, 0.0, Some(0));
+        let full = frame(&grid, &o, 0.0, Some(grid.width));
         assert!(none.chars().all(|c| c == ' ' || c == '\n'));
-        // Fully revealed frame has ink.
         assert!(full.chars().any(|c| !c.is_whitespace()));
     }
 
     #[test]
-    fn sweep_frame_has_correct_line_count() {
+    fn frame_line_count_and_color() {
         let b = banner();
-        let f = sweep_frame(&b, &grad(), ColorMode::True, 0.25);
-        assert_eq!(f.lines().count(), b.height());
+        let o = opts(ColorMode::True, None);
+        let grid = compose(&b, o.border, o.padding);
+        let f = frame(&grid, &o, 0.25, None);
+        assert_eq!(f.lines().count(), grid.height);
         assert!(f.contains("\x1b[38;2;"));
+    }
+
+    #[test]
+    fn border_shows_during_animation() {
+        let b = banner();
+        let o = opts(ColorMode::None, Border::parse("round").unwrap());
+        let grid = compose(&b, o.border, o.padding);
+        // A mid-reveal frame should already include the top-left corner.
+        let f = frame(&grid, &o, 0.0, Some(1));
+        assert!(f.contains('╭'));
     }
 }
