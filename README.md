@@ -108,7 +108,7 @@ Curated bundles of font + gradient + border + background: `cyberpunk`, `retro`, 
 
 ### Fonts
 
-`standard`, `ansishadow`, `slant`, `big`, `small` (with aliases like `shadow`, `italic`, `mini`). Run `sigil fonts` for a live preview. Bundled fonts are embedded in the binary — see [src/fonts/NOTICE.md](src/fonts/NOTICE.md) for attribution.
+`standard`, `ansishadow`, `slant`, `big`, `small`, `doom`, `bloody`, `3d`, `ansiregular`, `ghost` (with aliases like `shadow`, `italic`, `mini`, `ansi`). Run `sigil fonts` for a live preview. Bundled fonts are embedded in the binary — see [src/fonts/NOTICE.md](src/fonts/NOTICE.md) for attribution.
 
 **Custom fonts:** pass a path to any FIGlet font — `sigil "Hi" -f ./cool.flf` — or drop `.flf` files in `~/.config/sigil/fonts/` and use them by name (`-f cool`). They show up in `sigil fonts` too. Code-tagged glyphs are trimmed automatically so most fonts "just work."
 
