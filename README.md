@@ -56,6 +56,7 @@ sigil "Hello" --gradient ocean --direction diagonal --align center
 sigil "Ship it" --colors "#ff5f6d,#ffc371"   # custom gradient stops
 sigil "Deploy" --font ansishadow             # pick a font
 echo "From stdin" | sigil                     # or pipe the text in
+sigil --art cat.txt -g rainbow                # colorize existing ASCII art
 sigil "Launching" -g fire --animate sweep     # animated shimmer (TTY only)
 sigil "Ready" --animate type --fps 60         # typewriter reveal
 sigil "Angle" -g rainbow --angle 60 --cycle 2 # tilted, repeating palette
