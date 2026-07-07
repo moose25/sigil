@@ -134,7 +134,8 @@ struct Cli {
     #[arg(long)]
     no_color: bool,
 
-    /// Output format: term | ansi | raw | rust | go | python | shell. [default: term]
+    /// Output format: term | ansi | raw | code snippet
+    /// (rust|go|python|js|ts|c|cpp|ruby|shell) | svg | html | png | json. [default: term]
     #[arg(short = 'F', long)]
     format: Option<String>,
 
