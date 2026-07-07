@@ -142,6 +142,10 @@ struct Cli {
     #[arg(short = 'l', long)]
     lines: bool,
 
+    /// Also copy the output to the system clipboard.
+    #[arg(long)]
+    copy: bool,
+
     /// Pick a random font and gradient for any not explicitly set.
     #[arg(long)]
     random: bool,
@@ -249,6 +253,7 @@ struct Settings {
     fps: u32,
     no_color: bool,
     lines: bool,
+    copy: bool,
     art: Option<std::path::PathBuf>,
     color_by: String,
     interpolate: String,
@@ -330,6 +335,7 @@ impl Settings {
             fps: cli.fps.or(cfg.fps).unwrap_or(30),
             no_color: cli.no_color,
             lines: cli.lines,
+            copy: cli.copy,
             art: cli.art.clone(),
             color_by: pick(&cli.color_by, None, cfg.color_by, "banner"),
             interpolate: pick(&cli.interpolate, None, cfg.interpolate, "oklab"),
@@ -473,30 +479,32 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         title: s.title.clone(),
     };
 
-    // SVG/HTML are rendered directly from the grid, not from painted ANSI.
+    // SVG/HTML/JSON are rendered directly from the grid, not from painted ANSI.
     if format == Format::Svg {
         let svg = if anim == Anim::Sweep {
             sigil::render::to_svg_animated(&banner, &opts, background)
         } else {
             sigil::render::to_svg(&banner, &opts, background)
         };
-        return write_output(s.out.as_deref(), &svg);
+        return emit(s, &svg);
     }
     if format == Format::Html {
-        let html = sigil::render::to_html(&banner, &opts, background);
-        return write_output(s.out.as_deref(), &html);
+        return emit(s, &sigil::render::to_html(&banner, &opts, background));
     }
     if format == Format::Json {
-        let json = sigil::render::to_json(&banner, &opts);
-        return write_output(s.out.as_deref(), &json);
+        return emit(s, &sigil::render::to_json(&banner, &opts));
     }
     if format == Format::Png {
+        if s.copy {
+            return Err("cannot copy binary (png) to the clipboard".into());
+        }
         let bytes = sigil::render::to_png(&banner, &opts, background, s.scale)?;
         return write_bytes(s.out.as_deref(), &bytes);
     }
 
     // Animate only for live terminal output; snippets/files/pipes render static.
     if anim.is_animated()
+        && !s.copy
         && format == Format::Term
         && s.out.is_none()
         && std::io::stdout().is_terminal()
@@ -508,7 +516,48 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
 
     let painted = paint(&banner, &opts);
     let output = export::wrap(format, &painted);
-    write_output(s.out.as_deref(), &output)
+    emit(s, &output)
+}
+
+/// Copy `content` to the clipboard when `--copy` is set, then write it out.
+fn emit(s: &Settings, content: &str) -> Result<(), String> {
+    if s.copy {
+        copy_to_clipboard(content)?;
+        eprintln!("copied to clipboard");
+    }
+    write_output(s.out.as_deref(), content)
+}
+
+/// Pipe `content` to the platform clipboard tool.
+fn copy_to_clipboard(content: &str) -> Result<(), String> {
+    use std::process::{Command, Stdio};
+    let candidates: &[(&str, &[&str])] = if cfg!(target_os = "macos") {
+        &[("pbcopy", &[])]
+    } else if cfg!(target_os = "windows") {
+        &[("clip", &[])]
+    } else {
+        &[
+            ("wl-copy", &[]),
+            ("xclip", &["-selection", "clipboard"]),
+            ("xsel", &["-b", "-i"]),
+        ]
+    };
+    for (cmd, args) in candidates {
+        let child = Command::new(cmd).args(*args).stdin(Stdio::piped()).spawn();
+        if let Ok(mut child) = child {
+            child
+                .stdin
+                .take()
+                .ok_or("clipboard: no stdin")?
+                .write_all(content.as_bytes())
+                .map_err(|e| format!("clipboard write failed: {e}"))?;
+            child
+                .wait()
+                .map_err(|e| format!("clipboard tool failed: {e}"))?;
+            return Ok(());
+        }
+    }
+    Err("no clipboard tool found (need pbcopy / clip / wl-copy / xclip / xsel)".into())
 }
 
 /// Decide the color mode for a render, given the format and where output goes.
