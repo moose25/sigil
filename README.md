@@ -97,9 +97,16 @@ Unknown keys are rejected so typos surface early.
 
 `sigil` emits 24-bit truecolor when `COLORTERM` advertises it, falls back to the 256-color palette otherwise, and prints plain glyphs under `NO_COLOR` or `--no-color`.
 
+## Shell completions & man page
+
+```sh
+sigil completions zsh  > ~/.zfunc/_sigil       # bash | zsh | fish | powershell | elvish
+sigil man              > sigil.1               # roff man page
+```
+
 ## Roadmap
 
-Tracked in [issues](../../issues): unicode-width correctness, shell completions, packaging, and a demo gif.
+Tracked in [issues](../../issues): unicode-width correctness, packaging/releases, and a demo gif.
 
 ## License
 

@@ -1,7 +1,7 @@
-use std::io::{IsTerminal, Read};
+use std::io::{IsTerminal, Read, Write};
 use std::path::Path;
 
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 
 use sigil::animate::{self, Anim};
 use sigil::color::{ColorMode, Rgb};
@@ -102,6 +102,13 @@ enum Command {
     Gradients,
     /// List available fonts.
     Fonts,
+    /// Print a shell completion script (bash|zsh|fish|powershell|elvish).
+    Completions {
+        #[arg(value_name = "SHELL")]
+        shell: clap_complete::Shell,
+    },
+    /// Print a man page (roff) to stdout.
+    Man,
 }
 
 fn main() {
@@ -116,6 +123,11 @@ fn run(cli: Cli) -> Result<(), String> {
     match cli.command {
         Some(Command::Gradients) => list_gradients(base_mode(cli.no_color)),
         Some(Command::Fonts) => list_fonts(base_mode(cli.no_color)),
+        Some(Command::Completions { shell }) => {
+            print_completions(shell);
+            Ok(())
+        }
+        Some(Command::Man) => print_man(),
         None => {
             let text = resolve_text(&cli.text)?;
             let config = Config::load()?;
@@ -413,6 +425,24 @@ fn preview_font(
     };
     print!("{}", paint(&banner, &opts));
     Ok(())
+}
+
+/// Print a shell completion script for `shell` to stdout.
+fn print_completions(shell: clap_complete::Shell) {
+    let mut cmd = Cli::command();
+    let name = cmd.get_name().to_string();
+    clap_complete::generate(shell, &mut cmd, name, &mut std::io::stdout());
+}
+
+/// Render the man page (roff) to stdout.
+fn print_man() -> Result<(), String> {
+    let man = clap_mangen::Man::new(Cli::command());
+    let mut buf = Vec::new();
+    man.render(&mut buf)
+        .map_err(|e| format!("failed to render man page: {e}"))?;
+    std::io::stdout()
+        .write_all(&buf)
+        .map_err(|e| format!("failed to write man page: {e}"))
 }
 
 /// Best-effort terminal width; falls back to 80 columns.
