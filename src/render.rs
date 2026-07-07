@@ -76,6 +76,10 @@ pub struct RenderOptions {
     pub target_width: usize,
     /// Extra blank lines above and below the banner.
     pub margin_y: usize,
+    /// Flip the gradient's direction.
+    pub reverse: bool,
+    /// Repeat the palette this many times across the sweep.
+    pub cycle: u32,
 }
 
 /// Paint `banner` into a printable string with ANSI color escapes.
@@ -104,6 +108,7 @@ pub fn paint(banner: &Banner, opts: &RenderOptions) -> String {
                 continue;
             }
             let t = opts.direction.t(r, c, rows, cols);
+            let t = crate::gradient::adjust_t(t, opts.reverse, opts.cycle);
             let color = opts.gradient.sample(t);
             if opts.mode != ColorMode::None && last != Some(color) {
                 out.push_str(&opts.mode.fg(color));
@@ -145,6 +150,8 @@ mod tests {
             mode: ColorMode::None,
             target_width: 80,
             margin_y: 0,
+            reverse: false,
+            cycle: 1,
         };
         let out = paint(&b, &opts);
         assert!(!out.contains('\x1b'));
@@ -160,6 +167,8 @@ mod tests {
             mode: ColorMode::True,
             target_width: 80,
             margin_y: 0,
+            reverse: false,
+            cycle: 1,
         };
         let out = paint(&b, &opts);
         assert!(out.contains("\x1b[38;2;"));

@@ -31,6 +31,18 @@ struct Cli {
     #[arg(short, long, default_value = "horizontal")]
     direction: String,
 
+    /// Sweep angle in degrees (0 = left→right, 90 = top→bottom). Overrides --direction.
+    #[arg(long, allow_hyphen_values = true)]
+    angle: Option<f32>,
+
+    /// Reverse the gradient direction.
+    #[arg(long)]
+    reverse: bool,
+
+    /// Repeat the gradient palette N times across the banner.
+    #[arg(long, default_value_t = 1)]
+    cycle: u32,
+
     /// Alignment within the terminal width: left | center | right.
     #[arg(short, long, default_value = "left")]
     align: String,
@@ -131,7 +143,10 @@ fn render_banner(cli: &Cli, text: &str) -> Result<(), String> {
     let format = Format::parse(&cli.format)?;
     let font = fonts::load(&cli.font)?;
     let gradient = resolve_gradient(cli)?;
-    let direction = Direction::parse(&cli.direction)?;
+    let direction = match cli.angle {
+        Some(deg) => Direction::Angle(deg),
+        None => Direction::parse(&cli.direction)?,
+    };
     let align = Align::parse(&cli.align)?;
     let banner = Banner::layout(&font, text)?;
     let mode = color_mode(cli, format);
@@ -163,6 +178,8 @@ fn render_banner(cli: &Cli, text: &str) -> Result<(), String> {
         mode,
         target_width,
         margin_y,
+        reverse: cli.reverse,
+        cycle: cli.cycle,
     };
     let painted = paint(&banner, &opts);
     let output = export::wrap(format, &painted);
@@ -267,6 +284,8 @@ fn list_fonts(mode: ColorMode) -> Result<(), String> {
             mode,
             target_width: 0,
             margin_y: 0,
+            reverse: false,
+            cycle: 1,
         };
         print!("{}", paint(&banner, &opts));
     }

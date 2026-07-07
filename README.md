@@ -21,6 +21,7 @@ sigil "Deploy" --font ansishadow             # pick a font
 echo "From stdin" | sigil                     # or pipe the text in
 sigil "Launching" -g fire --animate sweep     # animated shimmer (TTY only)
 sigil "Ready" --animate type --fps 60         # typewriter reveal
+sigil "Angle" -g rainbow --angle 60 --cycle 2 # tilted, repeating palette
 sigil gradients                               # preview all presets
 sigil fonts                                   # preview all fonts
 sigil "plain" --no-color                      # respects NO_COLOR too
@@ -33,6 +34,9 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 | `-g, --gradient <name>` | Named preset (see `sigil gradients`) | `ocean` |
 | `-c, --colors <hex,...>` | Custom gradient stops, e.g. `#ff5f6d,#ffc371` | — |
 | `-d, --direction <dir>` | `horizontal` \| `vertical` \| `diagonal` | `horizontal` |
+| `--angle <deg>` | Sweep angle in degrees (overrides `--direction`) | — |
+| `--reverse` | Flip the gradient direction | — |
+| `--cycle <n>` | Repeat the palette N times across the banner | `1` |
 | `-a, --align <align>` | `left` \| `center` \| `right` | `left` |
 | `-f, --font <name>` | Font (see `sigil fonts`) | `standard` |
 | `-w, --width <cols>` | Target width for alignment | terminal width |
@@ -71,7 +75,7 @@ The `rust`/`go`/`python` snippets define a `BANNER` constant (with a comment sho
 
 ## Roadmap
 
-Tracked in [issues](../../issues): config files, borders, custom fonts, gradient angles, packaging, and docs.
+Tracked in [issues](../../issues): config files, borders, custom fonts, packaging, and docs.
 
 ## License
 

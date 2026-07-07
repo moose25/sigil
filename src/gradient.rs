@@ -77,11 +77,15 @@ impl Gradient {
 }
 
 /// The axis along which the gradient sweeps across the banner.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+///
+/// `Angle` is measured in degrees: 0° = left→right, 90° = top→bottom,
+/// 45° = diagonal — so the named variants are just convenient angles.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Direction {
     Horizontal,
     Vertical,
     Diagonal,
+    Angle(f32),
 }
 
 impl Direction {
@@ -93,6 +97,7 @@ impl Direction {
             Direction::Horizontal => fx,
             Direction::Vertical => fy,
             Direction::Diagonal => (fx + fy) * 0.5,
+            Direction::Angle(deg) => project(fx, fy, deg),
         }
     }
 
@@ -106,6 +111,31 @@ impl Direction {
             )),
         }
     }
+}
+
+/// Project a point in the unit square onto the direction at `deg` degrees,
+/// normalized to `[0, 1]` across the square.
+fn project(fx: f32, fy: f32, deg: f32) -> f32 {
+    let (s, c) = deg.to_radians().sin_cos();
+    let raw = fx * c + fy * s;
+    let min = c.min(0.0) + s.min(0.0);
+    let max = c.max(0.0) + s.max(0.0);
+    let span = max - min;
+    if span.abs() < 1e-6 {
+        0.0
+    } else {
+        (raw - min) / span
+    }
+}
+
+/// Apply `reverse` and `cycle` to a base parameter `t` in `[0, 1]`.
+///
+/// `cycle` repeats the palette that many times across the sweep; `reverse`
+/// flips its direction.
+pub fn adjust_t(t: f32, reverse: bool, cycle: u32) -> f32 {
+    let t = if reverse { 1.0 - t } else { t };
+    let cycle = cycle.max(1) as f32;
+    (t * cycle).rem_euclid(1.0)
 }
 
 /// Position within a span of `n` cells, in `[0, 1]`; 0.0 when there is one cell.
@@ -141,5 +171,29 @@ mod tests {
         assert_eq!(Direction::Horizontal.t(0, 0, 3, 5), 0.0);
         assert_eq!(Direction::Horizontal.t(0, 4, 3, 5), 1.0);
         assert_eq!(Direction::Vertical.t(2, 0, 3, 5), 1.0);
+    }
+
+    #[test]
+    fn angle_matches_named_directions() {
+        // 0° behaves like horizontal, 90° like vertical.
+        for (r, c) in [(0, 0), (1, 2), (2, 4)] {
+            let h = Direction::Horizontal.t(r, c, 3, 5);
+            let a0 = Direction::Angle(0.0).t(r, c, 3, 5);
+            assert!((h - a0).abs() < 1e-5, "{h} vs {a0}");
+            let v = Direction::Vertical.t(r, c, 3, 5);
+            let a90 = Direction::Angle(90.0).t(r, c, 3, 5);
+            assert!((v - a90).abs() < 1e-5, "{v} vs {a90}");
+        }
+    }
+
+    #[test]
+    fn adjust_reverse_and_cycle() {
+        assert_eq!(adjust_t(0.25, false, 1), 0.25);
+        assert_eq!(adjust_t(0.25, true, 1), 0.75);
+        // cycle=2 doubles the parameter and wraps.
+        assert!((adjust_t(0.3, false, 2) - 0.6).abs() < 1e-6);
+        assert!((adjust_t(0.6, false, 2) - 0.2).abs() < 1e-6);
+        // cycle=0 is treated as 1.
+        assert_eq!(adjust_t(0.4, false, 0), 0.4);
     }
 }
