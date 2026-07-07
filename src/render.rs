@@ -645,6 +645,35 @@ pub fn to_png(
     Ok(out)
 }
 
+/// Render the banner as JSON: dimensions plus per-cell char and hex color
+/// (null for spaces), for programmatic consumers.
+pub fn to_json(banner: &Banner, opts: &RenderOptions) -> String {
+    let grid = compose(banner, opts);
+    let mut rows = Vec::with_capacity(grid.height);
+    for row in 0..grid.height {
+        let mut cells = Vec::new();
+        for col in 0..grid.width {
+            let ch = grid.chars[row][col];
+            if ch == CONT {
+                continue;
+            }
+            let color = if ch == ' ' {
+                serde_json::Value::Null
+            } else {
+                serde_json::Value::String(hex(cell_color(&grid, opts, row, col, 0.0)))
+            };
+            cells.push(serde_json::json!({ "char": ch.to_string(), "color": color }));
+        }
+        rows.push(serde_json::Value::Array(cells));
+    }
+    let v = serde_json::json!({
+        "width": grid.width,
+        "height": grid.height,
+        "cells": rows,
+    });
+    serde_json::to_string_pretty(&v).unwrap_or_else(|_| "{}".to_string())
+}
+
 /// Render the banner as a standalone HTML document: a `<pre>` of colored
 /// `<span>`s, for embedding in web pages, docs, or HTML email.
 pub fn to_html(banner: &Banner, opts: &RenderOptions, background: Option<Rgb>) -> String {
@@ -801,6 +830,16 @@ mod tests {
             set.len()
         };
         assert!(distinct(ColorBy::Char) < distinct(ColorBy::Banner));
+    }
+
+    #[test]
+    fn json_has_dimensions_and_cells() {
+        let b = Banner::layout(&font(), "Hi").unwrap();
+        let json = to_json(&b, &base_opts(ColorMode::True));
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert!(v["width"].as_u64().unwrap() > 0);
+        assert!(v["height"].as_u64().unwrap() > 0);
+        assert!(v["cells"].as_array().unwrap().len() == v["height"].as_u64().unwrap() as usize);
     }
 
     #[test]
