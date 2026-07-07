@@ -786,7 +786,10 @@ mod tests {
         let b = Banner::layout(&font(), "Hi").unwrap();
         let bytes = to_png(&b, &base_opts(ColorMode::True), None).unwrap();
         // PNG magic number.
-        assert_eq!(&bytes[..8], &[0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1a, b'\n']);
+        assert_eq!(
+            &bytes[..8],
+            &[0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1a, b'\n']
+        );
         assert!(bytes.len() > 100);
     }
 
