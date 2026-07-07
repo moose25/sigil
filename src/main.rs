@@ -97,6 +97,11 @@ struct Cli {
     #[arg(short, long)]
     font: Option<String>,
 
+    /// Colorize an existing ASCII-art file instead of rendering a font
+    /// ("-" reads stdin). Overrides TEXT/--font.
+    #[arg(long, value_name = "FILE")]
+    art: Option<std::path::PathBuf>,
+
     /// Apply a named theme bundle (see `sigil themes`).
     #[arg(short = 't', long)]
     theme: Option<String>,
@@ -198,7 +203,12 @@ fn run(cli: Cli) -> Result<(), String> {
         }
         Some(Command::Man) => print_man(),
         None => {
-            let text = resolve_text(&cli.text, cli.lines)?;
+            // With --art the content comes from a file/stdin, not the positional text.
+            let text = if cli.art.is_some() {
+                String::new()
+            } else {
+                resolve_text(&cli.text, cli.lines)?
+            };
             let config = Config::load()?;
             let settings = Settings::resolve(&cli, config)?;
             render_banner(&settings, &text)
@@ -239,6 +249,7 @@ struct Settings {
     fps: u32,
     no_color: bool,
     lines: bool,
+    art: Option<std::path::PathBuf>,
     color_by: String,
     interpolate: String,
     title: Option<String>,
@@ -319,6 +330,7 @@ impl Settings {
             fps: cli.fps.or(cfg.fps).unwrap_or(30),
             no_color: cli.no_color,
             lines: cli.lines,
+            art: cli.art.clone(),
             color_by: pick(&cli.color_by, None, cfg.color_by, "banner"),
             interpolate: pick(&cli.interpolate, None, cfg.interpolate, "oklab"),
             title: cli.title.clone().or(cfg.title),
@@ -382,7 +394,9 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         None => Direction::parse(&s.direction)?,
     };
     let align = Align::parse(&s.align)?;
-    let banner = if s.lines {
+    let banner = if let Some(path) = &s.art {
+        Banner::from_art(&read_art(path)?)
+    } else if s.lines {
         let parts: Vec<&str> = text
             .split('\n')
             .map(str::trim)
@@ -776,6 +790,20 @@ fn random_seed(explicit: Option<u64>) -> u64 {
             .map(|d| d.as_nanos() as u64)
             .unwrap_or(0x5EED)
     })
+}
+
+/// Read ASCII art from a file, or stdin when the path is `-`.
+fn read_art(path: &Path) -> Result<String, String> {
+    if path.as_os_str() == "-" {
+        let mut buf = String::new();
+        std::io::stdin()
+            .read_to_string(&mut buf)
+            .map_err(|e| format!("failed to read stdin: {e}"))?;
+        Ok(buf)
+    } else {
+        std::fs::read_to_string(path)
+            .map_err(|e| format!("cannot read art {}: {e}", path.display()))
+    }
 }
 
 /// Best-effort terminal width; falls back to 80 columns.

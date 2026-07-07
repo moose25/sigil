@@ -160,6 +160,26 @@ impl Banner {
         Ok(Banner { lines, width })
     }
 
+    /// Build a banner from existing multi-line art (not a FIGlet font): keep the
+    /// characters as-is and pad to a common display width.
+    pub fn from_art(content: &str) -> Banner {
+        let mut lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
+        while lines.last().is_some_and(|l| l.trim().is_empty()) {
+            lines.pop();
+        }
+        if lines.is_empty() {
+            lines.push(String::new());
+        }
+        let width = lines.iter().map(|l| display_width(l)).max().unwrap_or(0);
+        for l in &mut lines {
+            let pad = width - display_width(l);
+            if pad > 0 {
+                l.push_str(&" ".repeat(pad));
+            }
+        }
+        Banner { lines, width }
+    }
+
     pub fn height(&self) -> usize {
         self.lines.len()
     }
@@ -879,6 +899,15 @@ mod tests {
         assert_eq!(display_width(first), 3);
         assert!(first.contains('日') && first.contains('x'));
         assert!(!first.contains(CONT));
+    }
+
+    #[test]
+    fn from_art_pads_and_preserves() {
+        let art = " /\\_/\\\n( o.o )\n"; // ragged lines
+        let b = Banner::from_art(art);
+        assert_eq!(b.height(), 2);
+        assert!(b.lines.iter().all(|l| display_width(l) == b.width));
+        assert!(b.lines[0].contains('/')); // art kept as-is
     }
 
     #[test]
