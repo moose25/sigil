@@ -156,11 +156,11 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 
 ### Gradients
 
-`sunset`, `ocean`, `fire`, `mint`, `grape`, `cyberpunk`, `gold`, `ice`, `vaporwave`, `rainbow`, `matrix`, `flamingo`, `mono`, `aurora`, `lava`, `neon`, `pastel`, `dusk`, `berry`, `steel`, `forest` — or roll your own with `--colors`.
+`sunset`, `ocean`, `fire`, `mint`, `grape`, `cyberpunk`, `gold`, `ice`, `vaporwave`, `rainbow`, `matrix`, `flamingo`, `mono`, `aurora`, `lava`, `neon`, `pastel`, `dusk`, `berry`, `steel`, `forest`, `coral`, `glacier`, `nebula`, `moss`, `peach`, `twilight` — or roll your own with `--colors`.
 
 ### Themes
 
-Curated bundles of font + gradient + border + background (+ shadow/outline): `cyberpunk`, `retro`, `terminal`, `fire`, `ocean`, `gold`, `mono`, `sunset`, `forest`, `candy`, `midnight`. Apply one with `--theme <name>` (individual flags still override), define your own under `[themes.<name>]` in config, and list them with `sigil themes`.
+Curated bundles of font + gradient + border + background (+ shadow/outline): `cyberpunk`, `retro`, `terminal`, `fire`, `ocean`, `gold`, `mono`, `sunset`, `forest`, `candy`, `midnight`, `synthwave`, `arctic`, `sepia`. Apply one with `--theme <name>` (individual flags still override), define your own under `[themes.<name>]` in config, and list them with `sigil themes`.
 
 ### Fonts
 
