@@ -372,7 +372,7 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         background,
     };
 
-    // SVG is rendered directly from the grid, not from painted ANSI.
+    // SVG/HTML are rendered directly from the grid, not from painted ANSI.
     if format == Format::Svg {
         let svg = if anim == Anim::Sweep {
             sigil::render::to_svg_animated(&banner, &opts, background)
@@ -380,6 +380,10 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
             sigil::render::to_svg(&banner, &opts, background)
         };
         return write_output(s.out.as_deref(), &svg);
+    }
+    if format == Format::Html {
+        let html = sigil::render::to_html(&banner, &opts, background);
+        return write_output(s.out.as_deref(), &html);
     }
 
     // Animate only for live terminal output; snippets/files/pipes render static.

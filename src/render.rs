@@ -423,6 +423,64 @@ fn push_animated_span(
     out.push_str("</tspan>");
 }
 
+/// Render the banner as a standalone HTML document: a `<pre>` of colored
+/// `<span>`s, for embedding in web pages, docs, or HTML email.
+pub fn to_html(banner: &Banner, opts: &RenderOptions, background: Option<Rgb>) -> String {
+    let grid = compose(banner, opts.border, opts.padding);
+    let bg = background.unwrap_or(Rgb::new(13, 17, 23));
+
+    let mut s = String::new();
+    s.push_str("<!DOCTYPE html>\n<meta charset=\"utf-8\">\n");
+    s.push_str(&format!(
+        "<pre style=\"font:bold 16px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;\
+         line-height:1.2;background:{};padding:16px;border-radius:8px;\
+         display:inline-block;color:#fff\">",
+        hex(bg)
+    ));
+    for row in 0..grid.height {
+        let mut run = String::new();
+        let mut fill: Option<Rgb> = None;
+        for col in 0..grid.width {
+            let ch = grid.chars[row][col];
+            if ch == CONT {
+                continue;
+            }
+            let cell_fill = if ch == ' ' {
+                fill
+            } else {
+                Some(cell_color(&grid, opts, row, col, 0.0))
+            };
+            if ch != ' ' && cell_fill != fill && !run.is_empty() {
+                push_html_span(&mut s, &run, fill);
+                run.clear();
+            }
+            if ch != ' ' {
+                fill = cell_fill;
+            }
+            run.push(ch);
+        }
+        push_html_span(&mut s, &run, fill);
+        s.push('\n');
+    }
+    s.push_str("</pre>\n");
+    s
+}
+
+/// Emit a `<span>` for a run of text with an optional color.
+fn push_html_span(out: &mut String, text: &str, fill: Option<Rgb>) {
+    if text.is_empty() {
+        return;
+    }
+    match fill {
+        Some(c) => out.push_str(&format!(
+            "<span style=\"color:{}\">{}</span>",
+            hex(c),
+            xml_escape(text)
+        )),
+        None => out.push_str(&xml_escape(text)),
+    }
+}
+
 /// Emit a `<tspan>` for a run of text with an optional fill color.
 fn push_span(out: &mut String, text: &str, fill: Option<Rgb>) {
     if text.is_empty() {
@@ -491,6 +549,16 @@ mod tests {
     #[test]
     fn xml_special_chars_escaped() {
         assert_eq!(xml_escape("a<b>&c"), "a&lt;b&gt;&amp;c");
+    }
+
+    #[test]
+    fn html_has_colored_spans() {
+        let b = Banner::layout(&font(), "Hi").unwrap();
+        let html = to_html(&b, &base_opts(ColorMode::True), None);
+        assert!(html.starts_with("<!DOCTYPE html>"));
+        assert!(html.contains("<pre"));
+        assert!(html.contains("<span style=\"color:#"));
+        assert!(html.trim_end().ends_with("</pre>"));
     }
 
     #[test]
