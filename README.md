@@ -59,6 +59,8 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 
 `standard`, `ansishadow`, `slant`, `big`, `small` (with aliases like `shadow`, `italic`, `mini`). Run `sigil fonts` for a live preview. Bundled fonts are embedded in the binary — see [src/fonts/NOTICE.md](src/fonts/NOTICE.md) for attribution.
 
+**Custom fonts:** pass a path to any FIGlet font — `sigil "Hi" -f ./cool.flf` — or drop `.flf` files in `~/.config/sigil/fonts/` and use them by name (`-f cool`). They show up in `sigil fonts` too. Code-tagged glyphs are trimmed automatically so most fonts "just work."
+
 ## Embed in your own tool
 
 Generate a banner once and paste it into your project — a splash for `--help`, a startup logo, a script header. `--format` emits ready-to-use output:
@@ -79,7 +81,7 @@ The `rust`/`go`/`python` snippets define a `BANNER` constant (with a comment sho
 
 ## Roadmap
 
-Tracked in [issues](../../issues): config files, custom fonts, packaging, and docs.
+Tracked in [issues](../../issues): config files, packaging, and docs.
 
 ## License
 

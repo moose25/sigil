@@ -305,24 +305,41 @@ fn swatch(g: &Gradient, mode: ColorMode, width: usize) -> String {
 fn list_fonts(mode: ColorMode) -> Result<(), String> {
     let gradient = Gradient::preset("ocean").unwrap();
     for info in fonts::catalog() {
-        println!("\n\x1b[1m{}\x1b[0m — {}", info.name, info.description);
-        let font = fonts::load(info.name)?;
-        let banner = Banner::layout(&font, "Sigil")?;
-        let opts = RenderOptions {
-            gradient: gradient.clone(),
-            direction: Direction::Horizontal,
-            align: Align::Left,
-            mode,
-            target_width: 0,
-            margin_y: 0,
-            reverse: false,
-            cycle: 1,
-            border: None,
-            padding: (0, 0),
-            border_color: None,
-        };
-        print!("{}", paint(&banner, &opts));
+        preview_font(info.name, info.description, &gradient, mode)?;
     }
+    let user = fonts::user_font_names();
+    if !user.is_empty() {
+        println!("\n\x1b[1mUser fonts\x1b[0m (~/.config/sigil/fonts):");
+        for name in user {
+            preview_font(&name, "custom", &gradient, mode)?;
+        }
+    }
+    Ok(())
+}
+
+fn preview_font(
+    name: &str,
+    description: &str,
+    gradient: &Gradient,
+    mode: ColorMode,
+) -> Result<(), String> {
+    println!("\n\x1b[1m{name}\x1b[0m — {description}");
+    let font = fonts::load(name)?;
+    let banner = Banner::layout(&font, "Sigil")?;
+    let opts = RenderOptions {
+        gradient: gradient.clone(),
+        direction: Direction::Horizontal,
+        align: Align::Left,
+        mode,
+        target_width: 0,
+        margin_y: 0,
+        reverse: false,
+        cycle: 1,
+        border: None,
+        padding: (0, 0),
+        border_color: None,
+    };
+    print!("{}", paint(&banner, &opts));
     Ok(())
 }
 
