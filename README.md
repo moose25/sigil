@@ -120,6 +120,7 @@ sigil "Acme" -g sunset -F python > banner.py        # BANNER = ...
 sigil "Acme" -g sunset -F shell  > banner.sh        # cat <<'…' heredoc that prints it
 sigil "Acme" -g sunset -F ansi   > banner.ansi      # raw colored ANSI bytes
 sigil "Acme" -g sunset -F svg    > banner.svg        # standalone SVG image
+sigil "Acme" -g sunset -F html   > banner.html       # standalone HTML page
 ```
 
 `-F svg` produces a self-contained SVG (colored monospace grid on a dark
