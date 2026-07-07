@@ -1,8 +1,9 @@
 name: CI
 
-# While the repo is private we test locally and run CI on demand only.
-# When it goes public, re-enable `pull_request` (and `push: main`) to gate merges.
 on:
+  push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
 
 env:
