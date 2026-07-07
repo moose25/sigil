@@ -60,6 +60,7 @@ sigil "Launching" -g fire --animate sweep     # animated shimmer (TTY only)
 sigil "Ready" --animate type --fps 60         # typewriter reveal
 sigil "Angle" -g rainbow --angle 60 --cycle 2 # tilted, repeating palette
 sigil "Boxed" -g ocean --border round         # frame it in a box
+sigil "Surprise" --random                      # random font + gradient (--seed N to repeat)
 sigil gradients                               # preview all presets
 sigil fonts                                   # preview all fonts
 sigil "plain" --no-color                      # respects NO_COLOR too
@@ -86,6 +87,8 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 | `-o, --out <file>` | Write to a file instead of stdout | — |
 | `--animate <style>` | `none` \| `sweep` \| `type` (terminal only) | `none` |
 | `--fps <n>` | Animation speed, 1–120 | `30` |
+| `--random` | Random font + gradient for anything unset | — |
+| `--seed <n>` | Seed for `--random` (reproducible) | — |
 | `--no-color` | Disable color | — |
 
 ### Gradients

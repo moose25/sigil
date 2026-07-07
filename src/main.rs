@@ -92,6 +92,14 @@ struct Cli {
     #[arg(long)]
     fps: Option<u32>,
 
+    /// Pick a random font and gradient for any not explicitly set.
+    #[arg(long)]
+    random: bool,
+
+    /// Seed for --random, for reproducible output.
+    #[arg(long)]
+    seed: Option<u64>,
+
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -179,10 +187,25 @@ impl Settings {
                 .or(from_cfg)
                 .unwrap_or_else(|| default.to_string())
         };
+        // With --random, fill any unset font/gradient with a random pick that
+        // overrides config defaults but not explicit flags.
+        let mut rng = cli.random.then(|| SplitMix::new(random_seed(cli.seed)));
+        let rand_gradient = rng.as_mut().map(|r| choose(Gradient::preset_names(), r));
+        let rand_font = rng.as_mut().map(|r| choose(&font_names(), r));
         Settings {
-            gradient: pick(&cli.gradient, cfg.gradient, "ocean"),
+            gradient: cli
+                .gradient
+                .clone()
+                .or(rand_gradient)
+                .or(cfg.gradient)
+                .unwrap_or_else(|| "ocean".to_string()),
             colors: cli.colors.clone().or(cfg.colors),
-            font: pick(&cli.font, cfg.font, "standard"),
+            font: cli
+                .font
+                .clone()
+                .or(rand_font)
+                .or(cfg.font)
+                .unwrap_or_else(|| "standard".to_string()),
             direction: pick(&cli.direction, cfg.direction, "horizontal"),
             align: pick(&cli.align, cfg.align, "left"),
             angle: cli.angle.or(cfg.angle),
@@ -464,6 +487,45 @@ fn print_man() -> Result<(), String> {
     std::io::stdout()
         .write_all(&buf)
         .map_err(|e| format!("failed to write man page: {e}"))
+}
+
+/// A tiny SplitMix64 PRNG — enough for picking a random font/gradient without
+/// pulling in an rng crate.
+struct SplitMix(u64);
+
+impl SplitMix {
+    fn new(seed: u64) -> SplitMix {
+        SplitMix(seed)
+    }
+
+    fn next(&mut self) -> u64 {
+        self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = self.0;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        z ^ (z >> 31)
+    }
+}
+
+/// Choose a random element from `items`.
+fn choose(items: &[&str], rng: &mut SplitMix) -> String {
+    let i = (rng.next() % items.len() as u64) as usize;
+    items[i].to_string()
+}
+
+/// Bundled font names, for random selection.
+fn font_names() -> Vec<&'static str> {
+    fonts::catalog().map(|f| f.name).collect()
+}
+
+/// Seed for `--random`: the explicit `--seed`, or the current time.
+fn random_seed(explicit: Option<u64>) -> u64 {
+    explicit.unwrap_or_else(|| {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos() as u64)
+            .unwrap_or(0x5EED)
+    })
 }
 
 /// Best-effort terminal width; falls back to 80 columns.
