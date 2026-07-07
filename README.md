@@ -146,7 +146,7 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 | `--wrap <cols>` | Word-wrap long text so each rendered line fits within N columns (alias `--max-width`) | — |
 | `-m, --margin <n>` | Blank lines above/below | `0` |
 | `--margin-x <n>` | Left indent in columns (on top of alignment) | `0` |
-| `-F, --format <fmt>` | `term` \| `ansi` \| `raw` \| `rust` \| `go` \| `python` \| `shell` | `term` |
+| `-F, --format <fmt>` | `term` \| `ansi` \| `raw` \| `rust` \| `go` \| `python` \| `js` \| `ts` \| `c` \| `cpp` \| `ruby` \| `shell` \| `svg` \| `html` \| `png` \| `json` | `term` |
 | `-o, --out <file>` | Write to a file instead of stdout | — |
 | `--animate <style>` | `none` \| `sweep` \| `type` \| `pulse` \| `scroll` (terminal only) | `none` |
 | `--fps <n>` | Animation speed, 1–120 | `30` |
@@ -178,6 +178,11 @@ Generate a banner once and paste it into your project — a splash for `--help`,
 sigil "Acme" -g sunset -F rust   > src/banner.rs   # pub const BANNER: &str = ...
 sigil "Acme" -g sunset -F go     > banner.go        # const Banner = ...
 sigil "Acme" -g sunset -F python > banner.py        # BANNER = ...
+sigil "Acme" -g sunset -F js     > banner.js        # export const BANNER = ...
+sigil "Acme" -g sunset -F ts     > banner.ts        # export const BANNER: string = ...
+sigil "Acme" -g sunset -F c      > banner.c         # static const char *BANNER = ...
+sigil "Acme" -g sunset -F cpp    > banner.hpp       # inline constexpr ... BANNER = ...
+sigil "Acme" -g sunset -F ruby   > banner.rb        # BANNER = ...
 sigil "Acme" -g sunset -F shell  > banner.sh        # cat <<'…' heredoc that prints it
 sigil "Acme" -g sunset -F ansi   > banner.ansi      # raw colored ANSI bytes
 sigil "Acme" -g sunset -F svg    > banner.svg        # standalone SVG image
@@ -193,7 +198,14 @@ backdrop) — drop it straight into a README or docs. Add `--animate sweep` for 
 `-F png` writes a raster image (one color block per cell — crisp, font-free, and
 best with block fonts like `ansishadow`/`ansiregular`).
 
-The `rust`/`go`/`python` snippets define a `BANNER` constant (with a comment showing how to print it); `shell` is a runnable heredoc. Color is baked into every snippet format. Use `-o <file>` instead of a shell redirect if you prefer.
+The `rust`/`go`/`python`/`js`/`ts`/`c`/`cpp`/`ruby` snippets define a `BANNER` constant (with a comment showing how to print it); `shell` is a runnable heredoc. Color is baked into every snippet format. Use `-o <file>` instead of a shell redirect if you prefer.
+
+Prefer a ready-to-call function over a bare constant? Add `--func`:
+
+```sh
+sigil "Acme" -g sunset -F rust --func > src/banner.rs   # pub fn print_banner() { … }
+sigil "Acme" -g sunset -F python --func > banner.py      # def print_banner(): …
+```
 
 ## Config
 

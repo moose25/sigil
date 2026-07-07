@@ -46,6 +46,7 @@ pub struct Config {
     pub animate: Option<String>,
     pub fps: Option<u32>,
     pub format: Option<String>,
+    pub func: Option<bool>,
     /// User-defined named gradients: name -> list of hex stops.
     pub gradients: HashMap<String, Vec<String>>,
     /// User-defined themes: name -> coordinated option bundle.
@@ -115,6 +116,7 @@ impl Config {
             animate,
             fps,
             format,
+            func,
         );
         // Named gradients and themes merge per-key (project entries win).
         for (name, stops) in other.gradients {
