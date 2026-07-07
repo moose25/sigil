@@ -374,7 +374,11 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
 
     // SVG is rendered directly from the grid, not from painted ANSI.
     if format == Format::Svg {
-        let svg = sigil::render::to_svg(&banner, &opts, background);
+        let svg = if anim == Anim::Sweep {
+            sigil::render::to_svg_animated(&banner, &opts, background)
+        } else {
+            sigil::render::to_svg(&banner, &opts, background)
+        };
         return write_output(s.out.as_deref(), &svg);
     }
 
