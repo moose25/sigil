@@ -86,6 +86,8 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 | `--background <hex>` | Solid background fill behind the banner (alias `--bg`) | — |
 | `--shadow` | Draw a drop shadow behind the glyphs | — |
 | `--shadow-color <hex>` | Shadow color | dark gray |
+| `--outline` | Draw an outline (halo) around the glyphs | — |
+| `--outline-color <hex>` | Outline color | near-black |
 | `-a, --align <align>` | `left` \| `center` \| `right` | `left` |
 | `-f, --font <name>` | Font (see `sigil fonts`) | `standard` |
 | `-w, --width <cols>` | Target width for alignment | terminal width |

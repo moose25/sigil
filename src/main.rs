@@ -73,6 +73,14 @@ struct Cli {
     #[arg(long, value_name = "HEX")]
     shadow_color: Option<String>,
 
+    /// Draw an outline (halo) around the glyphs.
+    #[arg(long)]
+    outline: bool,
+
+    /// Outline color as a hex value (default: near-black).
+    #[arg(long, value_name = "HEX")]
+    outline_color: Option<String>,
+
     /// Alignment within the terminal width: left | center | right. [default: left]
     #[arg(short, long)]
     align: Option<String>,
@@ -217,6 +225,8 @@ struct Settings {
     title: Option<String>,
     shadow: bool,
     shadow_color: Option<String>,
+    outline: bool,
+    outline_color: Option<String>,
     user_gradients: std::collections::HashMap<String, Vec<String>>,
 }
 
@@ -293,6 +303,8 @@ impl Settings {
             title: cli.title.clone().or(cfg.title),
             shadow: cli.shadow || cfg.shadow.unwrap_or(false),
             shadow_color: cli.shadow_color.clone().or(cfg.shadow_color),
+            outline: cli.outline || cfg.outline.unwrap_or(false),
+            outline_color: cli.outline_color.clone().or(cfg.outline_color),
             user_gradients: cfg.gradients,
         })
     }
@@ -379,6 +391,14 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
     } else {
         None
     };
+    let outline = if s.outline {
+        Some(match &s.outline_color {
+            Some(hex) => Rgb::parse(hex)?,
+            None => Rgb::new(10, 10, 12),
+        })
+    } else {
+        None
+    };
 
     // Framed width includes the border and padding.
     let framed_w = banner.width + 2 * padding.0 + if border.is_some() { 2 } else { 0 };
@@ -405,6 +425,7 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         background,
         color_by,
         shadow,
+        outline,
         title: s.title.clone(),
     };
 
@@ -590,6 +611,7 @@ fn preview_font(
         background: None,
         color_by: ColorBy::Banner,
         shadow: None,
+        outline: None,
         title: None,
     };
     print!("{}", paint(&banner, &opts));
