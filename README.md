@@ -182,6 +182,13 @@ sunset2 = ["#ff9966", "#ff5e62"]
 
 Unknown keys are rejected so typos surface early. Your gradients show up in `sigil gradients`. Run `sigil init` to drop a commented starter config in place (`--print` to preview, `--force` to overwrite).
 
+Not sure what's being applied? `sigil config path` prints the files sigil reads (and whether each exists), and `sigil config show` prints the effective merged values:
+
+```sh
+sigil config path   # where are my config files?
+sigil config show   # what settings are actually in effect?
+```
+
 ## Color support
 
 `sigil` emits 24-bit truecolor when `COLORTERM` advertises it, falls back to the 256-color palette otherwise, and prints plain glyphs under `NO_COLOR` or `--no-color`.
