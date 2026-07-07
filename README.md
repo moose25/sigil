@@ -36,28 +36,30 @@ sigil demo                     # see a showcase of fonts, gradients, and effects
 
 ## Gallery
 
-<p align="center">
-  <img src="assets/gallery.svg" alt="a bordered, titled banner" width="360">
-</p>
+A few of the combinations sigil can produce — every image below was generated
+with `sigil … -F svg` (see the command under each):
 
-Fonts, borders, and a smooth Oklab gradient (shown here without color):
+<table>
+  <tr>
+    <td align="center"><img src="assets/g1-slant.svg" alt="slant + sunset" width="260"><br><sub><code>-f slant -g sunset</code></sub></td>
+    <td align="center"><img src="assets/g2-doom.svg" alt="doom + fire + shadow" width="260"><br><sub><code>-f doom -g fire --shadow</code></sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/g3-neon.svg" alt="ansiregular + neon + outline" width="260"><br><sub><code>-f ansiregular -g neon --outline</code></sub></td>
+    <td align="center"><img src="assets/g5-retro.svg" alt="big + vaporwave + double border" width="260"><br><sub><code>-f big -g vaporwave -b double</code></sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/g6-aurora.svg" alt="small + aurora + round border + title" width="260"><br><sub><code>-f small -g aurora -b round --title sigil</code></sub></td>
+    <td align="center"><img src="assets/g4-cyber.svg" alt="cyberpunk theme" width="260"><br><sub><code>--theme cyberpunk</code></sub></td>
+  </tr>
+</table>
 
-```text
-███████╗██╗ ██████╗ ██╗██╗       ╭────────────────────────────────────╮
-██╔════╝██║██╔════╝ ██║██║       │                                    │
-███████╗██║██║  ███╗██║██║       │    _                           _   │
-╚════██║██║██║   ██║██║██║       │   | |__   ___  __ __  ___   __| |  │
-███████║██║╚██████╔╝██║███████╗   │   | '_ \ / _ \ \ \ / / -_) / _` |  │
-╚══════╝╚═╝ ╚═════╝ ╚═╝╚══════╝   │   |_.__/ \___/ /_\_\ \___| \__,_|  │
-     -f ansishadow                ╰────────────────────────────────────╯
-```
-
-Animated preview (gradient shimmer + typewriter reveal): run `vhs demo.tape` to
-generate `demo.gif` — see [`demo.tape`](demo.tape). Or just try it live:
+Run `sigil demo` to see the showcase live, or try an animation:
 
 ```sh
 sigil "launch" -g fire --animate sweep
 sigil "ready"  --animate type --fps 60
+sigil "loop"   -g rainbow --animate scroll
 ```
 
 ## Usage
