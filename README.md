@@ -10,6 +10,8 @@
 
 > A single self-contained binary with no runtime dependencies.
 
+**Contents:** [Install](#install) · [Quick start](#quick-start) · [Usage](#usage) · [Embed in your own tool](#embed-in-your-own-tool) · [Config](#config) · [Development](#development)
+
 ## Install
 
 ```sh
@@ -186,10 +188,29 @@ sigil completions zsh  > ~/.zfunc/_sigil       # bash | zsh | fish | powershell 
 sigil man              > sigil.1               # roff man page
 ```
 
-## Roadmap
+## Development
 
-Tracked in [issues](../../issues): unicode-width correctness, and further polish as it surfaces.
+```sh
+cargo build          # debug build
+cargo test           # run the test suite
+cargo fmt            # format
+cargo clippy --all-targets -- -D warnings
+cargo run -- "Hi"    # try it
+```
+
+Contributions welcome. The codebase is small and modular:
+
+- `color` — sRGB/Oklab math and ANSI escapes
+- `gradient` — presets, sampling, interpolation spaces
+- `fonts` — bundled + custom FIGlet fonts
+- `render` — layout, the cell grid, effects, and the SVG/HTML/PNG/JSON renderers
+- `animate` — terminal animations
+- `text` / `config` / `themes` / `export` — input folding, config, themes, formats
+
+Ideas and open work are tracked in [issues](../../issues) and grouped by
+milestone. See [CHANGELOG.md](CHANGELOG.md) for the feature history.
 
 ## License
 
-MIT
+[MIT](LICENSE) © Chris Williams. Bundled FIGlet fonts retain their original
+permissive licenses — see [src/fonts/NOTICE.md](src/fonts/NOTICE.md).
