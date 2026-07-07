@@ -75,13 +75,31 @@ sigil "Acme" -g sunset -F ansi   > banner.ansi      # raw colored ANSI bytes
 
 The `rust`/`go`/`python` snippets define a `BANNER` constant (with a comment showing how to print it); `shell` is a runnable heredoc. Color is baked into every snippet format. Use `-o <file>` instead of a shell redirect if you prefer.
 
+## Config
+
+Set defaults so you don't repeat flags. sigil reads two optional files and merges them, then command-line flags override everything:
+
+**Precedence:** CLI flag > `.sigil.toml` (project, current dir) > `~/.config/sigil/config.toml` (user) > built-in default.
+
+```toml
+# ~/.config/sigil/config.toml  or  ./.sigil.toml
+gradient = "vaporwave"
+font = "ansishadow"
+align = "center"
+border = "round"
+# any of: colors, direction, angle, reverse, cycle, padding,
+# border_color, margin, width, animate, fps, format
+```
+
+Unknown keys are rejected so typos surface early.
+
 ## Color support
 
 `sigil` emits 24-bit truecolor when `COLORTERM` advertises it, falls back to the 256-color palette otherwise, and prints plain glyphs under `NO_COLOR` or `--no-color`.
 
 ## Roadmap
 
-Tracked in [issues](../../issues): config files, packaging, and docs.
+Tracked in [issues](../../issues): unicode-width correctness, shell completions, packaging, and a demo gif.
 
 ## License
 

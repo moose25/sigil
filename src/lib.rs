@@ -10,6 +10,7 @@
 
 pub mod animate;
 pub mod color;
+pub mod config;
 pub mod export;
 pub mod fonts;
 pub mod gradient;
