@@ -107,3 +107,49 @@ fn config_show_runs() {
         .unwrap()
         .contains("Effective config"));
 }
+
+#[test]
+fn fit_respects_the_column_budget() {
+    let out = run(&["hi", "--fit", "30", "-F", "raw"]);
+    assert!(out.status.success());
+    let s = String::from_utf8(out.stdout).unwrap();
+    let widest = s.lines().map(|l| l.chars().count()).max().unwrap_or(0);
+    assert!(widest <= 30, "fit picked a font wider than 30: {widest}");
+}
+
+#[test]
+fn gallery_writes_html_with_svgs() {
+    let out = run(&["gallery", "Acme"]);
+    assert!(out.status.success());
+    let s = String::from_utf8(out.stdout).unwrap();
+    assert!(s.contains("<!DOCTYPE html>"));
+    assert!(s.contains("sigil gallery"));
+    assert!(s.matches("<svg").count() > 20); // fonts + gradients + themes
+}
+
+#[test]
+fn mark_outputs_svg() {
+    let out = run(&["mark", "acme"]);
+    assert!(out.status.success());
+    let s = String::from_utf8(out.stdout).unwrap();
+    assert!(s.trim_start().starts_with("<svg"));
+}
+
+#[test]
+fn gradient_file_loads_a_palette() {
+    let path = std::env::temp_dir().join("sigil_it_palette.gpl");
+    std::fs::write(&path, "GIMP Palette\n# c\n255 95 109 Coral\n#ffc371\n").unwrap();
+    let out = run(&["hi", "--gradient-file", path.to_str().unwrap(), "-F", "raw"]);
+    let _ = std::fs::remove_file(&path);
+    assert!(out.status.success());
+    assert!(!String::from_utf8(out.stdout).unwrap().trim().is_empty());
+}
+
+#[test]
+fn subtitle_stacks_under_the_banner() {
+    let plain = run(&["Acme", "-F", "raw"]);
+    let withsub = run(&["Acme", "--subtitle", "tag", "-F", "raw"]);
+    let n1 = String::from_utf8(plain.stdout).unwrap().lines().count();
+    let n2 = String::from_utf8(withsub.stdout).unwrap().lines().count();
+    assert!(n2 > n1, "subtitle should add rows ({n1} -> {n2})");
+}

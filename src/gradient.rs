@@ -27,18 +27,57 @@ impl Interp {
 }
 
 /// A multi-stop gradient over sRGB stops, blended in a chosen [`Interp`] space.
+///
+/// `positions` holds each stop's location in `[0, 1]`, ascending; for an evenly
+/// spaced gradient they are `0, 1/(n-1), … 1`, but callers can supply custom
+/// positions to bias the blend.
 #[derive(Clone, Debug)]
 pub struct Gradient {
     stops: Vec<Rgb>,
+    positions: Vec<f32>,
     interp: Interp,
 }
 
 impl Gradient {
-    /// Build a gradient from one or more sRGB stops (Oklab blending by default).
+    /// Build a gradient from one or more evenly spaced sRGB stops (Oklab
+    /// blending by default).
     pub fn new(stops: &[Rgb]) -> Gradient {
         assert!(!stops.is_empty(), "gradient needs at least one stop");
+        let n = stops.len();
+        let positions = (0..n)
+            .map(|i| {
+                if n == 1 {
+                    0.0
+                } else {
+                    i as f32 / (n - 1) as f32
+                }
+            })
+            .collect();
         Gradient {
             stops: stops.to_vec(),
+            positions,
+            interp: Interp::default(),
+        }
+    }
+
+    /// Build a gradient from stops at explicit positions in `[0, 1]`.
+    ///
+    /// Positions are sorted with their stops, so callers need not pre-sort. Must
+    /// be the same length as `stops` and non-empty.
+    pub fn with_positions(stops: &[Rgb], positions: &[f32]) -> Gradient {
+        assert!(
+            !stops.is_empty() && stops.len() == positions.len(),
+            "positioned gradient needs matching, non-empty stops and positions"
+        );
+        let mut pairs: Vec<(f32, Rgb)> = positions
+            .iter()
+            .map(|p| p.clamp(0.0, 1.0))
+            .zip(stops.iter().copied())
+            .collect();
+        pairs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+        Gradient {
+            stops: pairs.iter().map(|(_, c)| *c).collect(),
+            positions: pairs.iter().map(|(p, _)| *p).collect(),
             interp: Interp::default(),
         }
     }
@@ -55,10 +94,17 @@ impl Gradient {
         if self.stops.len() == 1 {
             return self.stops[0];
         }
-        let segments = self.stops.len() - 1;
-        let scaled = t * segments as f32;
-        let idx = (scaled.floor() as usize).min(segments - 1);
-        let local = scaled - idx as f32;
+        // Find the segment whose position range contains `t`.
+        let mut idx = 0;
+        while idx + 2 < self.stops.len() && t > self.positions[idx + 1] {
+            idx += 1;
+        }
+        let (p0, p1) = (self.positions[idx], self.positions[idx + 1]);
+        let local = if (p1 - p0).abs() < 1e-6 {
+            0.0
+        } else {
+            ((t - p0) / (p1 - p0)).clamp(0.0, 1.0)
+        };
         let (a, b) = (self.stops[idx], self.stops[idx + 1]);
         match self.interp {
             Interp::Oklab => a.to_oklab().lerp(b.to_oklab(), local).to_rgb(),
@@ -179,6 +225,10 @@ pub enum Direction {
     Vertical,
     Diagonal,
     Angle(f32),
+    /// Sweeps outward from the banner's center (a ring gradient).
+    Radial,
+    /// Sweeps around the banner's center (a cone/angle gradient).
+    Conic,
 }
 
 impl Direction {
@@ -191,6 +241,16 @@ impl Direction {
             Direction::Vertical => fy,
             Direction::Diagonal => (fx + fy) * 0.5,
             Direction::Angle(deg) => project(fx, fy, deg),
+            // Distance from center, normalized so a corner reaches 1.0.
+            Direction::Radial => {
+                let (dx, dy) = (fx - 0.5, fy - 0.5);
+                ((dx * dx + dy * dy).sqrt() / std::f32::consts::FRAC_1_SQRT_2).clamp(0.0, 1.0)
+            }
+            // Angle around the center, normalized to [0, 1) starting at due west.
+            Direction::Conic => {
+                let a = (fy - 0.5).atan2(fx - 0.5); // -PI..=PI
+                (a + std::f32::consts::PI) / std::f32::consts::TAU
+            }
         }
     }
 
@@ -199,8 +259,10 @@ impl Direction {
             "horizontal" | "h" => Ok(Direction::Horizontal),
             "vertical" | "v" => Ok(Direction::Vertical),
             "diagonal" | "d" => Ok(Direction::Diagonal),
+            "radial" | "ring" => Ok(Direction::Radial),
+            "conic" | "cone" => Ok(Direction::Conic),
             _ => Err(format!(
-                "unknown direction: {s} (horizontal|vertical|diagonal)"
+                "unknown direction: {s} (horizontal|vertical|diagonal|radial|conic)"
             )),
         }
     }
@@ -364,6 +426,49 @@ mod tests {
             assert!(Gradient::preset(name).is_some(), "missing preset {name}");
         }
         assert!(Gradient::preset("nonsense").is_none());
+    }
+
+    #[test]
+    fn positioned_stops_bias_the_blend() {
+        let black = Rgb::new(0, 0, 0);
+        let white = Rgb::new(255, 255, 255);
+        // White doesn't start until t=0.8, so t=0.5 is still solid black.
+        let g = Gradient::with_positions(&[black, white], &[0.8, 1.0]).with_interp(Interp::Rgb);
+        assert_eq!(g.sample(0.0), black);
+        assert_eq!(g.sample(0.5), black);
+        // ~90% of the way, i.e. about halfway through the 0.8–1.0 segment: mid-gray.
+        let mid = g.sample(0.9);
+        assert!(
+            (mid.r as i16 - 128).abs() <= 2,
+            "expected ~mid-gray, got {mid:?}"
+        );
+        assert_eq!(g.sample(1.0), white);
+    }
+
+    #[test]
+    fn with_positions_sorts_unordered_input() {
+        let a = Rgb::new(10, 0, 0);
+        let b = Rgb::new(0, 0, 10);
+        // Positions given out of order are sorted with their stops.
+        let g = Gradient::with_positions(&[a, b], &[1.0, 0.0]);
+        assert_eq!(g.sample(0.0), b);
+        assert_eq!(g.sample(1.0), a);
+    }
+
+    #[test]
+    fn radial_and_conic_parse_and_bound() {
+        assert_eq!(Direction::parse("radial").unwrap(), Direction::Radial);
+        assert_eq!(Direction::parse("conic").unwrap(), Direction::Conic);
+        // Center is the low point of a radial sweep; a corner reaches the top.
+        let center = Direction::Radial.t(2, 2, 5, 5);
+        let corner = Direction::Radial.t(0, 0, 5, 5);
+        assert!(center < 0.01);
+        assert!((corner - 1.0).abs() < 1e-4);
+        // Conic stays within [0, 1] all the way around.
+        for (r, c) in [(0, 0), (0, 4), (4, 0), (4, 4), (2, 2)] {
+            let t = Direction::Conic.t(r, c, 5, 5);
+            assert!((0.0..=1.0).contains(&t), "conic t out of range: {t}");
+        }
     }
 
     #[test]

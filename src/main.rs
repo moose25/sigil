@@ -12,7 +12,8 @@ use sigil::gradient::{Direction, Gradient, Interp};
 use sigil::render::{paint, Align, Banner, Border, ColorBy, RenderOptions};
 use sigil::themes::{self, Theme};
 
-/// Give your CLI a face — modern gradient ASCII banners.
+/// Brand your project in seconds — gradient ASCII banners for your CLI,
+/// README, or source code.
 #[derive(Parser)]
 #[command(name = "sigil", version, about, long_about = None)]
 struct Cli {
@@ -33,6 +34,11 @@ struct Cli {
     /// Overrides --gradient (but --colors wins over this).
     #[arg(long, value_name = "HEX")]
     from: Option<String>,
+
+    /// Load gradient stops from a palette file (one hex or "R G B" per line;
+    /// GIMP .gpl supported). Overridden by --colors.
+    #[arg(long, value_name = "FILE")]
+    gradient_file: Option<std::path::PathBuf>,
 
     /// Sweep direction: horizontal | vertical | diagonal. [default: horizontal]
     #[arg(short, long)]
@@ -74,6 +80,11 @@ struct Cli {
     #[arg(long, visible_alias = "bg", value_name = "HEX")]
     background: Option<String>,
 
+    /// Gradient background behind the banner: a preset name or comma-separated
+    /// hex stops (e.g. --bg-gradient dusk).
+    #[arg(long, value_name = "SPEC")]
+    bg_gradient: Option<String>,
+
     /// Caption to embed in the top border (needs a border).
     #[arg(long, value_name = "TEXT")]
     title: Option<String>,
@@ -102,6 +113,11 @@ struct Cli {
     #[arg(long)]
     color_by: Option<String>,
 
+    /// Glyph fill: glyph (normal) | shade (block-shade ░▒▓█ by brightness, so
+    /// the gradient reads without color). [default: glyph]
+    #[arg(long, value_name = "MODE")]
+    fill: Option<String>,
+
     /// Gradient blend space: oklab | rgb | hsl. [default: oklab]
     #[arg(long)]
     interpolate: Option<String>,
@@ -114,6 +130,27 @@ struct Cli {
     /// ("-" reads stdin). Overrides TEXT/--font.
     #[arg(long, value_name = "FILE")]
     art: Option<std::path::PathBuf>,
+
+    /// Prefix a small icon/emoji to the left of the banner, e.g. --icon "🚀".
+    #[arg(long, value_name = "GLYPH")]
+    icon: Option<String>,
+
+    /// Extra blank columns between glyphs, for a letter-spaced look.
+    #[arg(long, value_name = "N")]
+    letter_spacing: Option<usize>,
+
+    /// A smaller tagline stacked beneath the main banner (logo + subtitle).
+    #[arg(long, value_name = "TEXT")]
+    subtitle: Option<String>,
+
+    /// Font for the --subtitle line. [default: small]
+    #[arg(long, value_name = "NAME")]
+    subtitle_font: Option<String>,
+
+    /// Auto-pick the boldest bundled font whose banner fits in N columns
+    /// (overrides --font).
+    #[arg(long, value_name = "COLS")]
+    fit: Option<usize>,
 
     /// Apply a named theme bundle (see `sigil themes`).
     #[arg(short = 't', long)]
@@ -220,6 +257,43 @@ enum Command {
         #[command(subcommand)]
         action: ConfigAction,
     },
+    /// Print a random banner and the flags to reproduce it.
+    Random {
+        /// Text to render (default: Sigil).
+        #[arg(value_name = "TEXT")]
+        text: Vec<String>,
+        /// Seed for a reproducible random pick.
+        #[arg(long)]
+        seed: Option<u64>,
+    },
+    /// Write a self-contained HTML page showcasing your text across fonts,
+    /// gradients, and themes.
+    Gallery {
+        /// Text to showcase (default: Sigil).
+        #[arg(value_name = "TEXT")]
+        text: Vec<String>,
+        /// Write to a file instead of stdout.
+        #[arg(short = 'o', long, value_name = "FILE")]
+        out: Option<std::path::PathBuf>,
+    },
+    /// Generate a deterministic geometric mark (logo) from a string, as SVG.
+    Mark {
+        /// Text the mark is derived from (default: sigil).
+        #[arg(value_name = "TEXT")]
+        text: Vec<String>,
+        /// Named gradient preset. [default: aurora]
+        #[arg(short, long)]
+        gradient: Option<String>,
+        /// Custom gradient stops (overrides --gradient).
+        #[arg(short = 'c', long)]
+        colors: Option<String>,
+        /// Background fill hex (alias --bg).
+        #[arg(long, visible_alias = "bg", value_name = "HEX")]
+        background: Option<String>,
+        /// Write to a file instead of stdout.
+        #[arg(short = 'o', long, value_name = "FILE")]
+        out: Option<std::path::PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -249,10 +323,7 @@ fn run(cli: Cli) -> Result<(), String> {
     match cli.command {
         Some(Command::Gradients) => list_gradients(base_mode(cli.no_color), &Config::load()?),
         Some(Command::Fonts) => list_fonts(base_mode(cli.no_color)),
-        Some(Command::Themes) => {
-            list_themes(&Config::load()?);
-            Ok(())
-        }
+        Some(Command::Themes) => list_themes(base_mode(cli.no_color), &Config::load()?),
         Some(Command::Demo) => demo(base_mode(cli.no_color)),
         Some(Command::Init { force, print }) => init_config(force, print),
         Some(Command::Completions { shell }) => {
@@ -267,6 +338,15 @@ fn run(cli: Cli) -> Result<(), String> {
             }
             ConfigAction::Show => show_config(),
         },
+        Some(Command::Random { text, seed }) => random_banner(base_mode(cli.no_color), &text, seed),
+        Some(Command::Mark {
+            text,
+            gradient,
+            colors,
+            background,
+            out,
+        }) => make_mark(&text, gradient, colors, background, out.as_deref()),
+        Some(Command::Gallery { text, out }) => make_gallery(&text, out.as_deref()),
         None => {
             // With --art the content comes from a file/stdin, not the positional text.
             let text = if cli.art.is_some() {
@@ -297,6 +377,7 @@ struct Settings {
     gradient: String,
     colors: Option<String>,
     from: Option<String>,
+    gradient_file: Option<std::path::PathBuf>,
     font: String,
     direction: String,
     align: String,
@@ -309,6 +390,7 @@ struct Settings {
     pad_y: Option<usize>,
     border_color: Option<String>,
     background: Option<String>,
+    bg_gradient: Option<String>,
     margin: usize,
     margin_x: usize,
     min_width: Option<usize>,
@@ -323,6 +405,12 @@ struct Settings {
     lines: bool,
     copy: bool,
     art: Option<std::path::PathBuf>,
+    icon: Option<String>,
+    shade: bool,
+    letter_spacing: Option<usize>,
+    subtitle: Option<String>,
+    subtitle_font: String,
+    fit: Option<usize>,
     color_by: String,
     interpolate: String,
     title: Option<String>,
@@ -372,6 +460,7 @@ impl Settings {
                 .unwrap_or_else(|| "ocean".to_string()),
             colors: cli.colors.clone().or(theme.colors).or(cfg.colors),
             from: cli.from.clone().or(cfg.from),
+            gradient_file: cli.gradient_file.clone().or(cfg.gradient_file),
             font: cli
                 .font
                 .clone()
@@ -398,6 +487,7 @@ impl Settings {
                 .clone()
                 .or(theme.background)
                 .or(cfg.background),
+            bg_gradient: cli.bg_gradient.clone().or(cfg.bg_gradient),
             margin: cli.margin.or(cfg.margin).unwrap_or(0),
             margin_x: cli.margin_x.or(cfg.margin_x).unwrap_or(0),
             min_width: cli.min_width.or(cfg.min_width),
@@ -414,6 +504,20 @@ impl Settings {
             art: cli.art.clone(),
             color_by: pick(&cli.color_by, None, cfg.color_by, "banner"),
             interpolate: pick(&cli.interpolate, None, cfg.interpolate, "oklab"),
+            icon: cli.icon.clone().or(cfg.icon),
+            shade: match cli.fill.clone().or(cfg.fill).as_deref() {
+                None | Some("glyph") => false,
+                Some("shade") => true,
+                Some(other) => return Err(format!("unknown fill: {other} (glyph|shade)")),
+            },
+            letter_spacing: cli.letter_spacing.or(cfg.letter_spacing),
+            subtitle: cli.subtitle.clone().or(cfg.subtitle),
+            subtitle_font: cli
+                .subtitle_font
+                .clone()
+                .or(cfg.subtitle_font)
+                .unwrap_or_else(|| "small".to_string()),
+            fit: cli.fit.or(cfg.fit),
             title: cli.title.clone().or(cfg.title),
             shadow: cli.shadow || theme.shadow.unwrap_or(false) || cfg.shadow.unwrap_or(false),
             shadow_color: cli
@@ -468,7 +572,12 @@ fn resolve_text(args: &[String], lines: bool) -> Result<String, String> {
 
 fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
     let format = Format::parse(&s.format)?;
-    let font = fonts::load(&s.font)?;
+    // --fit picks the boldest bundled font whose render fits in N columns,
+    // overriding --font; otherwise use the resolved font.
+    let font = match s.fit {
+        Some(cols) if s.art.is_none() => fonts::load(&fit_font(text, cols)?)?,
+        _ => fonts::load(&s.font)?,
+    };
     let gradient = resolve_gradient(s)?.with_interp(Interp::parse(&s.interpolate)?);
     let direction = match s.angle {
         Some(deg) => Direction::Angle(deg),
@@ -486,9 +595,24 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         Banner::layout_multi(&font, &parts)?
     } else if let Some(cols) = s.wrap {
         Banner::layout_wrapped(&font, text, cols)?
+    } else if let Some(sp) = s.letter_spacing {
+        Banner::layout_spaced(&font, text, sp)?
     } else {
         Banner::layout(&font, text)?
     };
+    // Stack a smaller subtitle beneath the main banner (shared gradient/border).
+    if let Some(sub) = &s.subtitle {
+        if !sub.trim().is_empty() {
+            let sub_font = fonts::load(&s.subtitle_font)?;
+            let sub_banner = Banner::layout(&sub_font, sub)?;
+            banner = Banner::stacked(&banner, &sub_banner, 1);
+        }
+    }
+    if let Some(icon) = &s.icon {
+        if !icon.is_empty() {
+            banner = banner.with_icon(icon, 2);
+        }
+    }
     let mode = color_mode(s, format);
     let anim = Anim::parse(&s.animate)?;
 
@@ -549,6 +673,10 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
     } else {
         None
     };
+    let background_gradient = match &s.bg_gradient {
+        Some(spec) => Some(gradient_from_spec(spec)?.with_interp(Interp::parse(&s.interpolate)?)),
+        None => None,
+    };
 
     // Framed width includes the border and padding.
     let framed_w = banner.width + 2 * padding.0 + if border.is_some() { 2 } else { 0 };
@@ -574,6 +702,8 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         padding,
         border_color,
         background,
+        background_gradient,
+        shade: s.shade,
         color_by,
         shadow,
         outline,
@@ -599,7 +729,12 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
         if s.copy {
             return Err("cannot copy binary (png) to the clipboard".into());
         }
-        let bytes = sigil::render::to_png(&banner, &opts, background, s.scale)?;
+        // --animate sweep produces an animated PNG (a looping gradient shimmer).
+        let bytes = if anim == Anim::Sweep {
+            sigil::render::to_apng(&banner, &opts, background, s.scale, 30, s.fps)?
+        } else {
+            sigil::render::to_png(&banner, &opts, background, s.scale)?
+        };
         return write_bytes(s.out.as_deref(), &bytes);
     }
 
@@ -669,7 +804,7 @@ fn color_mode(s: &Settings, format: Format) -> ColorMode {
     if s.no_color || std::env::var_os("NO_COLOR").is_some() {
         return ColorMode::None;
     }
-    if format == Format::Raw {
+    if format == Format::Raw || format == Format::Markdown {
         return ColorMode::None;
     }
     if format.forces_color() {
@@ -727,6 +862,10 @@ fn resolve_gradient(s: &Settings) -> Result<Gradient, String> {
         let base = Rgb::parse(hex.trim()).map_err(|e| format!("--from: {e}"))?;
         return Ok(Gradient::from_color(base));
     }
+    if let Some(path) = &s.gradient_file {
+        let colors = load_palette(path)?;
+        return Ok(Gradient::new(&colors));
+    }
     if let Some(stops) = s.user_gradients.get(&s.gradient) {
         return parse_stops(stops).map_err(|e| format!("gradient {:?}: {e}", s.gradient));
     }
@@ -734,16 +873,103 @@ fn resolve_gradient(s: &Settings) -> Result<Gradient, String> {
         .ok_or_else(|| format!("unknown gradient: {}. See `sigil gradients`.", s.gradient))
 }
 
+/// Load gradient stops from a palette file.
+///
+/// Accepts one color per line as `#rrggbb`/`rrggbb`/`#rgb` or a decimal
+/// `R G B` triple (so GIMP `.gpl` palettes and plain hex lists both work).
+/// Blank lines and anything that isn't a color (headers, comments) are skipped.
+fn load_palette(path: &Path) -> Result<Vec<Rgb>, String> {
+    let text = std::fs::read_to_string(path)
+        .map_err(|e| format!("cannot read palette {}: {e}", path.display()))?;
+    let mut colors = Vec::new();
+    for line in text.lines() {
+        let tokens: Vec<&str> = line.split_whitespace().collect();
+        if tokens.is_empty() {
+            continue;
+        }
+        // Decimal "R G B [name]" (e.g. GIMP .gpl entries).
+        if tokens.len() >= 3 {
+            if let (Ok(r), Ok(g), Ok(b)) = (
+                tokens[0].parse::<u8>(),
+                tokens[1].parse::<u8>(),
+                tokens[2].parse::<u8>(),
+            ) {
+                colors.push(Rgb::new(r, g, b));
+                continue;
+            }
+        }
+        // Otherwise a hex token; unparseable lines (headers/comments) are skipped.
+        if let Ok(c) = Rgb::parse(tokens[0]) {
+            colors.push(c);
+        }
+    }
+    if colors.is_empty() {
+        return Err(format!("no colors found in palette {}", path.display()));
+    }
+    Ok(colors)
+}
+
+/// Resolve a gradient spec that is either a preset name or a comma-separated
+/// list of hex stops (as accepted by `--colors`).
+fn gradient_from_spec(spec: &str) -> Result<Gradient, String> {
+    let spec = spec.trim();
+    if spec.contains(',') || spec.starts_with('#') {
+        parse_stops(&spec.split(',').map(str::to_string).collect::<Vec<_>>())
+    } else {
+        Gradient::preset(spec)
+            .ok_or_else(|| format!("unknown gradient: {spec}. See `sigil gradients`."))
+    }
+}
+
 /// Parse a list of hex color stops into a gradient.
+///
+/// Each stop is a hex color with an optional `@position` in `[0, 1]`
+/// (e.g. `#000@0`, `#fff@0.8`). If any stop is positioned, unpositioned ones
+/// fall back to their evenly-spaced default position.
 fn parse_stops(stops: &[String]) -> Result<Gradient, String> {
-    let colors = stops
-        .iter()
-        .map(|c| Rgb::parse(c.trim()))
-        .collect::<Result<Vec<_>, _>>()?;
+    let mut colors: Vec<Rgb> = Vec::new();
+    let mut positions: Vec<Option<f32>> = Vec::new();
+    for raw in stops {
+        let s = raw.trim();
+        if s.is_empty() {
+            continue;
+        }
+        let (hex, pos) = match s.split_once('@') {
+            Some((h, p)) => {
+                let v: f32 = p
+                    .trim()
+                    .parse()
+                    .map_err(|_| format!("invalid stop position: {p:?} (want 0-1)"))?;
+                if !(0.0..=1.0).contains(&v) {
+                    return Err(format!("stop position out of range (0-1): {v}"));
+                }
+                (h, Some(v))
+            }
+            None => (s, None),
+        };
+        colors.push(Rgb::parse(hex.trim())?);
+        positions.push(pos);
+    }
     if colors.is_empty() {
         return Err("needs at least one hex stop".into());
     }
-    Ok(Gradient::new(&colors))
+    if positions.iter().any(Option::is_some) {
+        let n = colors.len();
+        let filled: Vec<f32> = positions
+            .iter()
+            .enumerate()
+            .map(|(i, p)| {
+                p.unwrap_or(if n == 1 {
+                    0.0
+                } else {
+                    i as f32 / (n - 1) as f32
+                })
+            })
+            .collect();
+        Ok(Gradient::with_positions(&colors, &filled))
+    } else {
+        Ok(Gradient::new(&colors))
+    }
 }
 
 fn list_gradients(mode: ColorMode, cfg: &Config) -> Result<(), String> {
@@ -834,6 +1060,8 @@ fn preview_font(
         padding: (0, 0),
         border_color: None,
         background: None,
+        background_gradient: None,
+        shade: false,
         color_by: ColorBy::Banner,
         shadow: None,
         outline: None,
@@ -971,6 +1199,188 @@ fn join_names(names: &[&String]) -> String {
         .join(", ")
 }
 
+/// Render one showcase SVG for `text` in the given font and gradient.
+fn card_svg(text: &str, font_name: &str, gradient: Gradient) -> Result<String, String> {
+    let font = fonts::load(font_name)?;
+    let banner = Banner::layout(&font, text)?;
+    let opts = RenderOptions {
+        gradient,
+        direction: Direction::Horizontal,
+        align: Align::Left,
+        mode: ColorMode::True,
+        target_width: 0,
+        margin_y: 0,
+        margin_x: 0,
+        reverse: false,
+        cycle: 1,
+        border: None,
+        padding: (0, 0),
+        border_color: None,
+        background: None,
+        background_gradient: None,
+        shade: false,
+        color_by: ColorBy::Banner,
+        shadow: None,
+        outline: None,
+        title: None,
+    };
+    Ok(sigil::render::to_svg(&banner, &opts, None))
+}
+
+/// Write a self-contained HTML gallery of `text` across fonts, gradients, and
+/// themes — a single page you can open in a browser or share.
+fn make_gallery(text_args: &[String], out: Option<&Path>) -> Result<(), String> {
+    let text = if text_args.is_empty() {
+        "Sigil".to_string()
+    } else {
+        text_args.join(" ")
+    };
+    let esc = html_escape(&text);
+    let mut html = String::new();
+    html.push_str(&format!(
+        "<!DOCTYPE html>\n<meta charset=\"utf-8\">\n<title>sigil gallery — {esc}</title>\n\
+         <style>body{{background:#0d1117;color:#c9d1d9;font-family:ui-sans-serif,system-ui,\
+         Segoe UI,Roboto,sans-serif;margin:0;padding:32px}}h1{{font-weight:800}}\
+         h2{{margin-top:40px;border-bottom:1px solid #30363d;padding-bottom:6px}}\
+         .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}}\
+         .card{{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:14px}}\
+         .card svg{{max-width:100%;height:auto}}\
+         .card code{{display:block;margin-top:8px;color:#8b949e;font-size:12px}}</style>\n"
+    ));
+    html.push_str(&format!(
+        "<h1>sigil gallery</h1>\n<p>“{esc}” across every font, gradient, and theme.</p>\n"
+    ));
+
+    // Fonts (rotating gradient so each looks distinct).
+    html.push_str("<h2>Fonts</h2>\n<div class=\"grid\">\n");
+    let grads = Gradient::preset_names();
+    for (i, info) in fonts::catalog().enumerate() {
+        let g = grads[i % grads.len()];
+        let svg = card_svg(&text, info.name, Gradient::preset(g).unwrap())?;
+        html.push_str(&format!(
+            "<div class=\"card\">{svg}<code>-f {} -g {g}</code></div>\n",
+            info.name
+        ));
+    }
+    html.push_str("</div>\n");
+
+    // Gradients (all presets, one readable font).
+    html.push_str("<h2>Gradients</h2>\n<div class=\"grid\">\n");
+    for g in grads {
+        let svg = card_svg(&text, "small", Gradient::preset(g).unwrap())?;
+        html.push_str(&format!(
+            "<div class=\"card\">{svg}<code>-g {g}</code></div>\n"
+        ));
+    }
+    html.push_str("</div>\n");
+
+    // Themes.
+    html.push_str("<h2>Themes</h2>\n<div class=\"grid\">\n");
+    for name in themes::builtin_names() {
+        let t = themes::builtin(name).unwrap();
+        let g = match &t.colors {
+            Some(c) => parse_stops(&c.split(',').map(str::to_string).collect::<Vec<_>>())?,
+            None => Gradient::preset(t.gradient.as_deref().unwrap_or("ocean")).unwrap(),
+        };
+        let svg = card_svg(&text, t.font.as_deref().unwrap_or("standard"), g)?;
+        html.push_str(&format!(
+            "<div class=\"card\">{svg}<code>--theme {name}</code></div>\n"
+        ));
+    }
+    html.push_str("</div>\n");
+
+    write_output(out, &html)
+}
+
+/// Escape text for safe interpolation into HTML.
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
+/// Generate a deterministic geometric mark from `text` and write it as SVG.
+fn make_mark(
+    text_args: &[String],
+    gradient: Option<String>,
+    colors: Option<String>,
+    background: Option<String>,
+    out: Option<&Path>,
+) -> Result<(), String> {
+    let text = if text_args.is_empty() {
+        "sigil".to_string()
+    } else {
+        text_args.join(" ")
+    };
+    let grad = if let Some(list) = &colors {
+        parse_stops(&list.split(',').map(str::to_string).collect::<Vec<_>>())
+            .map_err(|e| format!("--colors: {e}"))?
+    } else {
+        let name = gradient.as_deref().unwrap_or("aurora");
+        Gradient::preset(name).ok_or_else(|| format!("unknown gradient: {name}"))?
+    };
+    let bg = match &background {
+        Some(hex) => Some(Rgb::parse(hex)?),
+        None => None,
+    };
+    let svg = sigil::mark::to_svg(&text, &grad, bg);
+    write_output(out, &svg)
+}
+
+/// Render a random banner (font + gradient + maybe a border/shadow) and print
+/// the exact flags to reproduce it.
+fn random_banner(mode: ColorMode, text_args: &[String], seed: Option<u64>) -> Result<(), String> {
+    let text = if text_args.is_empty() {
+        "Sigil".to_string()
+    } else {
+        text_args.join(" ")
+    };
+    let seed = random_seed(seed);
+    let mut rng = SplitMix::new(seed);
+    let font = choose(&font_names(), &mut rng);
+    let gradient = choose(Gradient::preset_names(), &mut rng);
+    let border = choose(&["none", "round", "single", "double", "heavy"], &mut rng);
+    let shadow = rng.next() % 2 == 0;
+
+    let f = fonts::load(&font)?;
+    let banner = Banner::layout(&f, &text)?;
+    let b = Border::parse(&border)?;
+    let opts = RenderOptions {
+        gradient: Gradient::preset(&gradient).unwrap(),
+        direction: Direction::Horizontal,
+        align: Align::Left,
+        mode,
+        target_width: 0,
+        margin_y: 0,
+        margin_x: 0,
+        reverse: false,
+        cycle: 1,
+        border: b,
+        padding: if b.is_some() { (2, 1) } else { (0, 0) },
+        border_color: None,
+        background: None,
+        background_gradient: None,
+        shade: false,
+        color_by: ColorBy::Banner,
+        shadow: shadow.then(|| Rgb::new(28, 28, 34)),
+        outline: None,
+        title: None,
+    };
+    print!("{}", paint(&banner, &opts));
+
+    // Reproduce line: explicit flags (deterministic), plus the seed shortcut.
+    let mut cmd = format!("sigil \"{text}\" -f {font} -g {gradient}");
+    if border != "none" {
+        cmd.push_str(&format!(" -b {border}"));
+    }
+    if shadow {
+        cmd.push_str(" --shadow");
+    }
+    println!("\n{}", bold(&cmd, mode));
+    println!("or: sigil random \"{text}\" --seed {seed}");
+    Ok(())
+}
+
 /// Render a short showcase of fonts, gradients, and effects.
 fn demo(mode: ColorMode) -> Result<(), String> {
     // text, font, gradient, border, shadow, outline
@@ -1011,6 +1421,8 @@ fn demo(mode: ColorMode) -> Result<(), String> {
             padding: if bordered { (2, 1) } else { (0, 0) },
             border_color: None,
             background: None,
+            background_gradient: None,
+            shade: false,
             color_by: ColorBy::Banner,
             shadow: shadow.then(|| Rgb::new(28, 28, 34)),
             outline: outline.then(|| Rgb::new(10, 10, 12)),
@@ -1025,23 +1437,26 @@ fn demo(mode: ColorMode) -> Result<(), String> {
     Ok(())
 }
 
-fn list_themes(cfg: &Config) {
-    println!("Built-in themes:\n");
+fn list_themes(mode: ColorMode, cfg: &Config) -> Result<(), String> {
+    println!("Built-in themes:");
     for name in themes::builtin_names() {
-        print_theme(name, &themes::builtin(name).unwrap());
+        preview_theme(name, &themes::builtin(name).unwrap(), mode)?;
     }
     if !cfg.themes.is_empty() {
-        println!("\nYour themes (from config):\n");
+        println!("\n{}", bold("Your themes (from config):", mode));
         let mut names: Vec<&String> = cfg.themes.keys().collect();
         names.sort();
         for name in names {
-            print_theme(name, &cfg.themes[name]);
+            preview_theme(name, &cfg.themes[name], mode)?;
         }
     }
     println!("\nUse: sigil \"Text\" --theme <name>  (flags still override)");
+    Ok(())
 }
 
-fn print_theme(name: &str, t: &Theme) {
+/// Print a theme's summary line and, when color is on, a mini `Sigil` banner
+/// rendered in that theme so its look is visible at a glance.
+fn preview_theme(name: &str, t: &Theme, mode: ColorMode) -> Result<(), String> {
     let parts = [
         t.font.as_deref().map(|v| format!("font={v}")),
         t.gradient.as_deref().map(|v| format!("gradient={v}")),
@@ -1049,7 +1464,45 @@ fn print_theme(name: &str, t: &Theme) {
         t.background.as_deref().map(|v| format!("bg={v}")),
     ];
     let desc: Vec<String> = parts.into_iter().flatten().collect();
-    println!("  {name:<11}  {}", desc.join("  "));
+    println!("\n{}  {}", bold(name, mode), desc.join("  "));
+    if mode == ColorMode::None {
+        return Ok(());
+    }
+    let font = fonts::load(t.font.as_deref().unwrap_or("standard"))?;
+    let banner = Banner::layout(&font, "Sigil")?;
+    let gradient = match &t.colors {
+        Some(c) => parse_stops(&c.split(',').map(str::to_string).collect::<Vec<_>>())?,
+        None => Gradient::preset(t.gradient.as_deref().unwrap_or("ocean"))
+            .ok_or_else(|| format!("theme {name}: unknown gradient"))?,
+    };
+    let border = Border::parse(t.border.as_deref().unwrap_or("none"))?;
+    let background = match &t.background {
+        Some(h) => Some(Rgb::parse(h)?),
+        None => None,
+    };
+    let opts = RenderOptions {
+        gradient,
+        direction: Direction::Horizontal,
+        align: Align::Left,
+        mode,
+        target_width: 0,
+        margin_y: 0,
+        margin_x: 0,
+        reverse: false,
+        cycle: 1,
+        border,
+        padding: if border.is_some() { (2, 1) } else { (0, 0) },
+        border_color: None,
+        background,
+        background_gradient: None,
+        shade: false,
+        color_by: ColorBy::Banner,
+        shadow: t.shadow.unwrap_or(false).then(|| Rgb::new(28, 28, 34)),
+        outline: t.outline.unwrap_or(false).then(|| Rgb::new(10, 10, 12)),
+        title: None,
+    };
+    print!("{}", paint(&banner, &opts));
+    Ok(())
 }
 
 /// A tiny SplitMix64 PRNG — enough for picking a random font/gradient without
@@ -1079,6 +1532,31 @@ fn choose(items: &[&str], rng: &mut SplitMix) -> String {
 /// Bundled font names, for random selection.
 fn font_names() -> Vec<&'static str> {
     fonts::catalog().map(|f| f.name).collect()
+}
+
+/// Pick the boldest bundled font whose rendered banner fits within `cols`
+/// columns for `text`. "Boldest" = tallest, then widest, among those that fit;
+/// if nothing fits (even the narrowest overflows), fall back to the narrowest.
+fn fit_font(text: &str, cols: usize) -> Result<String, String> {
+    let mut best: Option<(usize, usize, String)> = None; // (height, width, name), fits
+    let mut narrowest: Option<(usize, String)> = None; // (width, name), fallback
+    for info in fonts::catalog() {
+        let f = fonts::load(info.name)?;
+        let b = Banner::layout(&f, text)?;
+        if narrowest.as_ref().map_or(true, |(w, _)| b.width < *w) {
+            narrowest = Some((b.width, info.name.to_string()));
+        }
+        if b.width <= cols {
+            let key = (b.height(), b.width);
+            if best.as_ref().map_or(true, |(h, w, _)| key > (*h, *w)) {
+                best = Some((b.height(), b.width, info.name.to_string()));
+            }
+        }
+    }
+    Ok(best
+        .map(|(_, _, n)| n)
+        .or(narrowest.map(|(_, n)| n))
+        .unwrap_or_else(|| "standard".to_string()))
 }
 
 /// Seed for `--random`: the explicit `--seed`, or the current time.

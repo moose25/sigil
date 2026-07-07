@@ -30,6 +30,9 @@ cargo install --git https://github.com/moose25/sigil
 
 # Prebuilt binaries: grab the archive for your platform from the Releases page,
 # then move `sigil` onto your PATH.
+
+# Or fetch a prebuilt binary with cargo-binstall (no compile):
+cargo binstall sigil
 ```
 
 Once published to crates.io: `cargo install sigil`.
@@ -94,6 +97,7 @@ Run `sigil demo` to see the showcase live, or try an animation:
 sigil "launch" -g fire --animate sweep
 sigil "ready"  --animate type --fps 60
 sigil "loop"   -g rainbow --animate scroll
+sigil "shimmer" -g fire --animate sweep -F png -o banner.png  # animated PNG (APNG)
 ```
 
 ## Usage
@@ -109,13 +113,18 @@ sigil "Launching" -g fire --animate sweep     # animated shimmer (TTY only)
 sigil "Ready" --animate type --fps 60         # typewriter reveal
 sigil "Angle" -g rainbow --angle 60 --cycle 2 # tilted, repeating palette
 sigil "Boxed" -g ocean --border round         # frame it in a box
+sigil "Deploy" --icon "🚀" -g fire            # a small icon beside the wordmark
+sigil "Acme" --subtitle "ship faster" -f big  # a logo with a smaller tagline
 sigil "Surprise" --random                      # random font + gradient (--seed N to repeat)
 sigil --lines "deploy" "prod"                   # stack multiple banners in one frame
 sigil "A long project tagline" --wrap 60        # word-wrap long text to fit 60 cols
 sigil "Neo" --theme cyberpunk                   # a curated font+gradient+border+bg bundle
+sigil mark "acme" -g aurora -o mark.svg        # a unique geometric logo from a name
+sigil gallery "Acme" -o gallery.html           # a page of your text in every style
 sigil gradients                               # preview all presets
 sigil fonts                                   # preview all fonts
 sigil "plain" --no-color                      # respects NO_COLOR too
+sigil "Docs" -F markdown                       # a fenced code block for READMEs
 ```
 
 ### Options
@@ -123,11 +132,13 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 | Flag | Description | Default |
 | ---- | ----------- | ------- |
 | `-g, --gradient <name>` | Named preset (see `sigil gradients`) | `ocean` |
-| `-c, --colors <hex,...>` | Custom gradient stops, e.g. `#ff5f6d,#ffc371` | — |
+| `-c, --colors <hex,...>` | Custom gradient stops (optional `@pos`, e.g. `#000@0,#fff@0.8`) | — |
 | `--from <hex>` | Derive a gradient from one brand color (overridden by `--colors`) | — |
-| `-d, --direction <dir>` | `horizontal` \| `vertical` \| `diagonal` | `horizontal` |
+| `--gradient-file <file>` | Load stops from a palette file (hex-per-line or GIMP `.gpl`) | — |
+| `-d, --direction <dir>` | `horizontal` \| `vertical` \| `diagonal` \| `radial` \| `conic` | `horizontal` |
 | `--angle <deg>` | Sweep angle in degrees (overrides `--direction`) | — |
 | `--color-by <mode>` | `banner` \| `line` \| `char` (per-line / per-glyph coloring) | `banner` |
+| `--fill <mode>` | `glyph` \| `shade` (block-shade ░▒▓█ by brightness, reads without color) | `glyph` |
 | `--interpolate <space>` | Blend space: `oklab` \| `rgb` \| `hsl` | `oklab` |
 | `--reverse` | Flip the gradient direction | — |
 | `--cycle <n>` | Repeat the palette N times across the banner | `1` |
@@ -137,12 +148,18 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 | `--title <text>` | Caption embedded in the top border | — |
 | `--border-color <hex>` | Solid frame color (default: share the gradient) | — |
 | `--background <hex>` | Solid background fill behind the banner (alias `--bg`) | — |
+| `--bg-gradient <spec>` | Gradient background (preset name or `hex,hex,…`) | — |
 | `--shadow` | Draw a drop shadow behind the glyphs | — |
 | `--shadow-color <hex>` | Shadow color | dark gray |
 | `--outline` | Draw an outline (halo) around the glyphs | — |
 | `--outline-color <hex>` | Outline color | near-black |
 | `-a, --align <align>` | `left` \| `center` \| `right` | `left` |
 | `-f, --font <name>` | Font (see `sigil fonts`) | `standard` |
+| `--icon <glyph>` | Prefix a small icon/emoji to the left of the banner | — |
+| `--letter-spacing <n>` | Extra blank columns between glyphs (airier look) | — |
+| `--subtitle <text>` | A smaller tagline stacked beneath the banner | — |
+| `--subtitle-font <name>` | Font for the subtitle line | `small` |
+| `--fit <cols>` | Auto-pick the boldest bundled font whose banner fits N columns (overrides `--font`) | — |
 | `-w, --width <cols>` | Target width for alignment | terminal width |
 | `--min-width <cols>` | Pad the banner box out to at least N columns (centered) | — |
 | `--wrap <cols>` | Word-wrap long text so each rendered line fits within N columns (alias `--max-width`) | — |
