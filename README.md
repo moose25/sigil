@@ -108,6 +108,7 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 | `-a, --align <align>` | `left` \| `center` \| `right` | `left` |
 | `-f, --font <name>` | Font (see `sigil fonts`) | `standard` |
 | `--icon <glyph>` | Prefix a small icon/emoji to the left of the banner | — |
+| `--letter-spacing <n>` | Extra blank columns between glyphs (airier look) | — |
 | `-w, --width <cols>` | Target width for alignment | terminal width |
 | `--min-width <cols>` | Pad the banner box out to at least N columns (centered) | — |
 | `-m, --margin <n>` | Blank lines above/below | `0` |

@@ -160,6 +160,56 @@ impl Banner {
         Ok(Banner { lines, width })
     }
 
+    /// Render `text` with `spacing` extra blank columns between each glyph, for
+    /// an airier, letter-spaced look.
+    ///
+    /// Each character is laid out on its own and the rows are concatenated, so
+    /// the usual FIGlet kerning/smushing between neighbours is dropped in favour
+    /// of even, explicit spacing. `spacing == 0` still works (just no gap added).
+    pub fn layout_spaced(font: &FIGfont, text: &str, spacing: usize) -> Result<Banner, String> {
+        let text = crate::text::sanitize(text);
+        let gap = " ".repeat(spacing);
+        let mut rows: Vec<String> = Vec::new();
+        for (i, ch) in text.chars().enumerate() {
+            let figure = font
+                .convert(&ch.to_string())
+                .ok_or_else(|| format!("could not render {ch:?} with this font"))?;
+            let glyph: Vec<String> = figure.to_string().lines().map(str::to_string).collect();
+            // FIGlet glyphs share a fixed height, so every char has the same row
+            // count; seed `rows` from the first one.
+            if rows.is_empty() {
+                rows = vec![String::new(); glyph.len()];
+            }
+            for (r, line) in glyph.iter().enumerate() {
+                if r >= rows.len() {
+                    break;
+                }
+                if i > 0 {
+                    rows[r].push_str(&gap);
+                }
+                rows[r].push_str(line);
+            }
+        }
+        // Trim shared blank rows top and bottom, then pad to a common width.
+        while rows.first().is_some_and(|l| l.trim().is_empty()) {
+            rows.remove(0);
+        }
+        while rows.last().is_some_and(|l| l.trim().is_empty()) {
+            rows.pop();
+        }
+        if rows.is_empty() {
+            rows.push(String::new());
+        }
+        let width = rows.iter().map(|l| display_width(l)).max().unwrap_or(0);
+        for l in &mut rows {
+            let pad = width - display_width(l);
+            if pad > 0 {
+                l.push_str(&" ".repeat(pad));
+            }
+        }
+        Ok(Banner { lines: rows, width })
+    }
+
     /// Build a banner from existing multi-line art (not a FIGlet font): keep the
     /// characters as-is and pad to a common display width.
     pub fn from_art(content: &str) -> Banner {
@@ -809,6 +859,19 @@ mod tests {
             outline: None,
             title: None,
         }
+    }
+
+    #[test]
+    fn letter_spacing_widens_banner() {
+        let f = font();
+        let tight = Banner::layout(&f, "AB").unwrap();
+        let spaced = Banner::layout_spaced(&f, "AB", 4).unwrap();
+        assert!(spaced.width > tight.width);
+        assert_eq!(spaced.height(), tight.height());
+        assert!(spaced
+            .lines
+            .iter()
+            .all(|l| display_width(l) == spaced.width));
     }
 
     #[test]

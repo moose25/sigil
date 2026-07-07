@@ -114,6 +114,10 @@ struct Cli {
     #[arg(long, value_name = "GLYPH")]
     icon: Option<String>,
 
+    /// Extra blank columns between glyphs, for a letter-spaced look.
+    #[arg(long, value_name = "N")]
+    letter_spacing: Option<usize>,
+
     /// Apply a named theme bundle (see `sigil themes`).
     #[arg(short = 't', long)]
     theme: Option<String>,
@@ -290,6 +294,7 @@ struct Settings {
     copy: bool,
     art: Option<std::path::PathBuf>,
     icon: Option<String>,
+    letter_spacing: Option<usize>,
     color_by: String,
     interpolate: String,
     title: Option<String>,
@@ -379,6 +384,7 @@ impl Settings {
             color_by: pick(&cli.color_by, None, cfg.color_by, "banner"),
             interpolate: pick(&cli.interpolate, None, cfg.interpolate, "oklab"),
             icon: cli.icon.clone().or(cfg.icon),
+            letter_spacing: cli.letter_spacing.or(cfg.letter_spacing),
             title: cli.title.clone().or(cfg.title),
             shadow: cli.shadow || theme.shadow.unwrap_or(false) || cfg.shadow.unwrap_or(false),
             shadow_color: cli
@@ -449,6 +455,8 @@ fn render_banner(s: &Settings, text: &str) -> Result<(), String> {
             .filter(|l| !l.is_empty())
             .collect();
         Banner::layout_multi(&font, &parts)?
+    } else if let Some(sp) = s.letter_spacing {
+        Banner::layout_spaced(&font, text, sp)?
     } else {
         Banner::layout(&font, text)?
     };
