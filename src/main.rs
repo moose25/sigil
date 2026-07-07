@@ -322,10 +322,18 @@ impl Settings {
             color_by: pick(&cli.color_by, None, cfg.color_by, "banner"),
             interpolate: pick(&cli.interpolate, None, cfg.interpolate, "oklab"),
             title: cli.title.clone().or(cfg.title),
-            shadow: cli.shadow || cfg.shadow.unwrap_or(false),
-            shadow_color: cli.shadow_color.clone().or(cfg.shadow_color),
-            outline: cli.outline || cfg.outline.unwrap_or(false),
-            outline_color: cli.outline_color.clone().or(cfg.outline_color),
+            shadow: cli.shadow || theme.shadow.unwrap_or(false) || cfg.shadow.unwrap_or(false),
+            shadow_color: cli
+                .shadow_color
+                .clone()
+                .or(theme.shadow_color)
+                .or(cfg.shadow_color),
+            outline: cli.outline || theme.outline.unwrap_or(false) || cfg.outline.unwrap_or(false),
+            outline_color: cli
+                .outline_color
+                .clone()
+                .or(theme.outline_color)
+                .or(cfg.outline_color),
             scale: cli.scale.or(cfg.scale).unwrap_or(1),
             user_gradients: cfg.gradients,
         })

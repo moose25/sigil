@@ -108,7 +108,7 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 
 ### Themes
 
-Curated bundles of font + gradient + border + background: `cyberpunk`, `retro`, `terminal`, `fire`, `ocean`, `gold`. Apply one with `--theme <name>` (individual flags still override), define your own under `[themes.<name>]` in config, and list them with `sigil themes`.
+Curated bundles of font + gradient + border + background (+ shadow/outline): `cyberpunk`, `retro`, `terminal`, `fire`, `ocean`, `gold`, `mono`, `sunset`, `forest`, `candy`, `midnight`. Apply one with `--theme <name>` (individual flags still override), define your own under `[themes.<name>]` in config, and list them with `sigil themes`.
 
 ### Fonts
 

@@ -23,12 +23,16 @@ pub struct Theme {
     pub border_color: Option<String>,
     pub background: Option<String>,
     pub align: Option<String>,
+    pub shadow: Option<bool>,
+    pub shadow_color: Option<String>,
+    pub outline: Option<bool>,
+    pub outline_color: Option<String>,
 }
 
 /// A built-in theme by name (case-insensitive), or `None`.
 pub fn builtin(name: &str) -> Option<Theme> {
-    // Each string is validated downstream when the render resolves.
-    let t = |font: &str, gradient: &str, border: &str, background: Option<&str>| Theme {
+    // Strings are validated downstream when the render resolves.
+    let base = |font: &str, gradient: &str, border: &str, background: Option<&str>| Theme {
         font: Some(font.to_string()),
         gradient: Some(gradient.to_string()),
         border: Some(border.to_string()),
@@ -36,19 +40,52 @@ pub fn builtin(name: &str) -> Option<Theme> {
         ..Theme::default()
     };
     Some(match name.to_ascii_lowercase().as_str() {
-        "cyberpunk" => t("ansishadow", "cyberpunk", "heavy", Some("#0d0221")),
-        "retro" => t("big", "vaporwave", "double", Some("#160042")),
-        "terminal" => t("standard", "matrix", "single", Some("#001000")),
-        "fire" => t("slant", "fire", "none", None),
-        "ocean" => t("small", "ocean", "round", Some("#031420")),
-        "gold" => t("ansishadow", "gold", "double", Some("#1a1400")),
+        "cyberpunk" => base("ansishadow", "cyberpunk", "heavy", Some("#0d0221")),
+        "retro" => base("big", "vaporwave", "double", Some("#160042")),
+        "terminal" => base("standard", "matrix", "single", Some("#001000")),
+        "fire" => base("slant", "fire", "none", None),
+        "ocean" => base("small", "ocean", "round", Some("#031420")),
+        "gold" => base("ansishadow", "gold", "double", Some("#1a1400")),
+        "mono" => Theme {
+            outline: Some(true),
+            ..base("ansiregular", "mono", "single", Some("#0a0a0a"))
+        },
+        "sunset" => Theme {
+            shadow: Some(true),
+            ..base("slant", "sunset", "none", Some("#1a0a12"))
+        },
+        "forest" => Theme {
+            colors: Some("#0b3d2e,#2e8b57,#a8d08d".to_string()),
+            ..base("doom", "mint", "heavy", Some("#03150e"))
+        },
+        "candy" => Theme {
+            outline: Some(true),
+            outline_color: Some("#3a0d2a".to_string()),
+            ..base("bloody", "flamingo", "round", Some("#1a0410"))
+        },
+        "midnight" => Theme {
+            shadow: Some(true),
+            ..base("ansishadow", "ice", "double", Some("#05060f"))
+        },
         _ => return None,
     })
 }
 
 /// Names of all built-in themes, in display order.
 pub fn builtin_names() -> &'static [&'static str] {
-    &["cyberpunk", "retro", "terminal", "fire", "ocean", "gold"]
+    &[
+        "cyberpunk",
+        "retro",
+        "terminal",
+        "fire",
+        "ocean",
+        "gold",
+        "mono",
+        "sunset",
+        "forest",
+        "candy",
+        "midnight",
+    ]
 }
 
 #[cfg(test)]
@@ -62,6 +99,9 @@ mod tests {
             assert!(th.font.is_some() && th.gradient.is_some());
         }
         assert!(builtin("nope").is_none());
+        // Effect-bearing themes set their effects.
+        assert_eq!(builtin("midnight").unwrap().shadow, Some(true));
+        assert_eq!(builtin("mono").unwrap().outline, Some(true));
     }
 
     #[test]
