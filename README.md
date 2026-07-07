@@ -94,7 +94,7 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 | `-m, --margin <n>` | Blank lines above/below | `0` |
 | `-F, --format <fmt>` | `term` \| `ansi` \| `raw` \| `rust` \| `go` \| `python` \| `shell` | `term` |
 | `-o, --out <file>` | Write to a file instead of stdout | — |
-| `--animate <style>` | `none` \| `sweep` \| `type` (terminal only) | `none` |
+| `--animate <style>` | `none` \| `sweep` \| `type` \| `pulse` (terminal only) | `none` |
 | `--fps <n>` | Animation speed, 1–120 | `30` |
 | `-l, --lines` | Stack each input line/argument as its own banner | — |
 | `--random` | Random font + gradient for anything unset | — |
