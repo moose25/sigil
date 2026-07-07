@@ -104,7 +104,7 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 
 ### Gradients
 
-`sunset`, `ocean`, `fire`, `mint`, `grape`, `cyberpunk`, `gold`, `ice`, `vaporwave`, `rainbow`, `matrix`, `flamingo`, `mono` — or roll your own with `--colors`.
+`sunset`, `ocean`, `fire`, `mint`, `grape`, `cyberpunk`, `gold`, `ice`, `vaporwave`, `rainbow`, `matrix`, `flamingo`, `mono`, `aurora`, `lava`, `neon`, `pastel`, `dusk`, `berry`, `steel`, `forest` — or roll your own with `--colors`.
 
 ### Themes
 

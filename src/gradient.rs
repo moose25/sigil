@@ -83,6 +83,14 @@ impl Gradient {
             "matrix" => &[0x003b00, 0x00ff41],
             "flamingo" => &[0xf093fb, 0xf5576c],
             "mono" => &[0xffffff, 0x888888],
+            "aurora" => &[0x00c9ff, 0x92fe9d],
+            "lava" => &[0xff512f, 0xdd2476],
+            "neon" => &[0x39ff14, 0x00e5ff],
+            "pastel" => &[0xa8edea, 0xfed6e3],
+            "dusk" => &[0x2c3e50, 0xfd746c],
+            "berry" => &[0x8a2387, 0xe94057, 0xf27121],
+            "steel" => &[0xbdc3c7, 0x2c3e50],
+            "forest" => &[0x134e5e, 0x71b280],
             _ => return None,
         };
         Some(Gradient::new(
@@ -109,6 +117,14 @@ impl Gradient {
             "matrix",
             "flamingo",
             "mono",
+            "aurora",
+            "lava",
+            "neon",
+            "pastel",
+            "dusk",
+            "berry",
+            "steel",
+            "forest",
         ]
     }
 }
