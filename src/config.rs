@@ -18,6 +18,7 @@ use serde::Deserialize;
 pub struct Config {
     pub gradient: Option<String>,
     pub colors: Option<String>,
+    pub from: Option<String>,
     pub font: Option<String>,
     pub direction: Option<String>,
     pub align: Option<String>,
@@ -88,6 +89,7 @@ impl Config {
         overlay!(
             gradient,
             colors,
+            from,
             font,
             direction,
             align,
@@ -145,6 +147,7 @@ pub const STARTER: &str = "\
 # --- color ---
 # gradient    = \"vaporwave\"      # a preset, or define one under [gradients]
 # colors      = \"#ff5f6d,#ffc371\" # custom stops (overrides gradient)
+# from        = \"#ff5f6d\"        # derive a gradient from one brand color
 # interpolate = \"oklab\"          # oklab | rgb | hsl
 # color_by    = \"banner\"         # banner | line | char
 # direction   = \"horizontal\"     # horizontal | vertical | diagonal

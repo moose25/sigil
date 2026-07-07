@@ -107,6 +107,34 @@ impl Gradient {
         ))
     }
 
+    /// Build a pleasing gradient from a single base color.
+    ///
+    /// A flat fill is dull, so we spread the one color into a soft two-tone
+    /// sweep: a slightly darker, hue-nudged low end, through the base, into a
+    /// lighter, oppositely-nudged high end. All of it happens in Oklab, so the
+    /// lightness ramp stays perceptually even and the base color is still
+    /// clearly recognizable in the middle.
+    pub fn from_color(base: Rgb) -> Gradient {
+        let ok = base.to_oklab();
+        let chroma = (ok.a * ok.a + ok.b * ok.b).sqrt();
+        let hue = ok.b.atan2(ok.a);
+        // Reconstruct an Oklab color at a rotated hue with explicit L and chroma.
+        let at = |dh_deg: f32, l: f32, c: f32| {
+            let h = hue + dh_deg.to_radians();
+            crate::color::Oklab {
+                l: l.clamp(0.0, 1.0),
+                a: c * h.cos(),
+                b: c * h.sin(),
+            }
+            .to_rgb()
+        };
+        // Low: a touch darker, hue nudged one way, full chroma for richness.
+        let low = at(-12.0, ok.l * 0.82, chroma);
+        // High: lighter, hue nudged the other way, chroma eased so it glows.
+        let high = at(14.0, ok.l + (1.0 - ok.l) * 0.45, chroma * 0.9);
+        Gradient::new(&[low, base, high])
+    }
+
     /// Names of all built-in presets, in display order.
     pub fn preset_names() -> &'static [&'static str] {
         &[
@@ -303,6 +331,31 @@ mod tests {
         assert_ne!(oklab.sample(0.5), rgb.sample(0.5));
         assert_eq!(Interp::parse("hsl").unwrap(), Interp::Hsl);
         assert!(Interp::parse("nope").is_err());
+    }
+
+    #[test]
+    fn from_color_spans_light_to_dark_around_base() {
+        let base = Rgb::new(0xff, 0x5f, 0x6d);
+        let g = Gradient::from_color(base);
+        // Low end is darker than the high end (perceptual lightness ordering).
+        let low = g.sample(0.0).to_oklab().l;
+        let high = g.sample(1.0).to_oklab().l;
+        assert!(low < high, "expected low {low} < high {high}");
+        // The middle stays close to the base color it was derived from.
+        let mid = g.sample(0.5);
+        let d = |a: u8, b: u8| (a as i16 - b as i16).abs();
+        assert!(
+            d(mid.r, base.r) + d(mid.g, base.g) + d(mid.b, base.b) < 30,
+            "middle {mid:?} drifted from base {base:?}"
+        );
+    }
+
+    #[test]
+    fn from_color_handles_gray() {
+        // Near-gray has undefined hue; it must not panic or produce NaNs.
+        let g = Gradient::from_color(Rgb::new(128, 128, 128));
+        let _ = g.sample(0.0);
+        let _ = g.sample(1.0);
     }
 
     #[test]

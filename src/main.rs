@@ -29,6 +29,11 @@ struct Cli {
     #[arg(short = 'c', long)]
     colors: Option<String>,
 
+    /// Derive a gradient from a single brand color, e.g. --from "#ff5f6d".
+    /// Overrides --gradient (but --colors wins over this).
+    #[arg(long, value_name = "HEX")]
+    from: Option<String>,
+
     /// Sweep direction: horizontal | vertical | diagonal. [default: horizontal]
     #[arg(short, long)]
     direction: Option<String>,
@@ -291,6 +296,7 @@ fn base_mode(no_color: bool) -> ColorMode {
 struct Settings {
     gradient: String,
     colors: Option<String>,
+    from: Option<String>,
     font: String,
     direction: String,
     align: String,
@@ -365,6 +371,7 @@ impl Settings {
                 .or(cfg.gradient)
                 .unwrap_or_else(|| "ocean".to_string()),
             colors: cli.colors.clone().or(theme.colors).or(cfg.colors),
+            from: cli.from.clone().or(cfg.from),
             font: cli
                 .font
                 .clone()
@@ -715,6 +722,10 @@ fn resolve_gradient(s: &Settings) -> Result<Gradient, String> {
     if let Some(list) = &s.colors {
         return parse_stops(&list.split(',').map(str::to_string).collect::<Vec<_>>())
             .map_err(|e| format!("--colors: {e}"));
+    }
+    if let Some(hex) = &s.from {
+        let base = Rgb::parse(hex.trim()).map_err(|e| format!("--from: {e}"))?;
+        return Ok(Gradient::from_color(base));
     }
     if let Some(stops) = s.user_gradients.get(&s.gradient) {
         return parse_stops(stops).map_err(|e| format!("gradient {:?}: {e}", s.gradient));
