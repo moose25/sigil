@@ -10,6 +10,7 @@ use sigil::export::{self, Format};
 use sigil::fonts;
 use sigil::gradient::{Direction, Gradient};
 use sigil::render::{paint, Align, Banner, Border, RenderOptions};
+use sigil::themes::{self, Theme};
 
 /// Give your CLI a face — modern gradient ASCII banners.
 #[derive(Parser)]
@@ -68,6 +69,10 @@ struct Cli {
     #[arg(short, long)]
     font: Option<String>,
 
+    /// Apply a named theme bundle (see `sigil themes`).
+    #[arg(short = 't', long)]
+    theme: Option<String>,
+
     /// Target width for alignment (defaults to terminal width).
     #[arg(short = 'w', long)]
     width: Option<usize>,
@@ -118,6 +123,8 @@ enum Command {
     Gradients,
     /// List available fonts.
     Fonts,
+    /// List available themes.
+    Themes,
     /// Print a shell completion script (bash|zsh|fish|powershell|elvish).
     Completions {
         #[arg(value_name = "SHELL")]
@@ -139,6 +146,10 @@ fn run(cli: Cli) -> Result<(), String> {
     match cli.command {
         Some(Command::Gradients) => list_gradients(base_mode(cli.no_color), &Config::load()?),
         Some(Command::Fonts) => list_fonts(base_mode(cli.no_color)),
+        Some(Command::Themes) => {
+            list_themes(&Config::load()?);
+            Ok(())
+        }
         Some(Command::Completions { shell }) => {
             print_completions(shell);
             Ok(())
@@ -147,7 +158,7 @@ fn run(cli: Cli) -> Result<(), String> {
         None => {
             let text = resolve_text(&cli.text, cli.lines)?;
             let config = Config::load()?;
-            let settings = Settings::resolve(&cli, config);
+            let settings = Settings::resolve(&cli, config)?;
             render_banner(&settings, &text)
         }
     }
@@ -190,51 +201,76 @@ struct Settings {
 }
 
 impl Settings {
-    fn resolve(cli: &Cli, cfg: Config) -> Settings {
-        // A CLI flag wins; otherwise the config value; otherwise `default`.
-        let pick = |flag: &Option<String>, from_cfg: Option<String>, default: &str| {
+    fn resolve(cli: &Cli, cfg: Config) -> Result<Settings, String> {
+        // Resolve the theme (user config overrides a built-in of the same name).
+        let theme = match &cli.theme {
+            Some(name) => cfg
+                .themes
+                .get(name)
+                .cloned()
+                .or_else(|| themes::builtin(name))
+                .ok_or_else(|| format!("unknown theme: {name}. See `sigil themes`."))?,
+            None => Theme::default(),
+        };
+
+        // Precedence for each option: flag > theme > config > default.
+        let pick = |flag: &Option<String>,
+                    theme_v: Option<String>,
+                    cfg_v: Option<String>,
+                    default: &str| {
             flag.clone()
-                .or(from_cfg)
+                .or(theme_v)
+                .or(cfg_v)
                 .unwrap_or_else(|| default.to_string())
         };
-        // With --random, fill any unset font/gradient with a random pick that
-        // overrides config defaults but not explicit flags.
+        // --random fills any still-unset font/gradient (over theme/config, not flags).
         let mut rng = cli.random.then(|| SplitMix::new(random_seed(cli.seed)));
         let rand_gradient = rng.as_mut().map(|r| choose(Gradient::preset_names(), r));
         let rand_font = rng.as_mut().map(|r| choose(&font_names(), r));
-        Settings {
+
+        Ok(Settings {
             gradient: cli
                 .gradient
                 .clone()
                 .or(rand_gradient)
+                .or(theme.gradient)
                 .or(cfg.gradient)
                 .unwrap_or_else(|| "ocean".to_string()),
-            colors: cli.colors.clone().or(cfg.colors),
+            colors: cli.colors.clone().or(theme.colors).or(cfg.colors),
             font: cli
                 .font
                 .clone()
                 .or(rand_font)
+                .or(theme.font)
                 .or(cfg.font)
                 .unwrap_or_else(|| "standard".to_string()),
-            direction: pick(&cli.direction, cfg.direction, "horizontal"),
-            align: pick(&cli.align, cfg.align, "left"),
-            angle: cli.angle.or(cfg.angle),
-            reverse: cli.reverse || cfg.reverse.unwrap_or(false),
-            cycle: cli.cycle.or(cfg.cycle).unwrap_or(1),
-            border: pick(&cli.border, cfg.border, "none"),
-            padding: cli.padding.or(cfg.padding),
-            border_color: cli.border_color.clone().or(cfg.border_color),
-            background: cli.background.clone().or(cfg.background),
+            direction: pick(&cli.direction, theme.direction, cfg.direction, "horizontal"),
+            align: pick(&cli.align, theme.align, cfg.align, "left"),
+            angle: cli.angle.or(theme.angle).or(cfg.angle),
+            reverse: cli.reverse || theme.reverse.unwrap_or(false) || cfg.reverse.unwrap_or(false),
+            cycle: cli.cycle.or(theme.cycle).or(cfg.cycle).unwrap_or(1),
+            border: pick(&cli.border, theme.border, cfg.border, "none"),
+            padding: cli.padding.or(theme.padding).or(cfg.padding),
+            border_color: cli
+                .border_color
+                .clone()
+                .or(theme.border_color)
+                .or(cfg.border_color),
+            background: cli
+                .background
+                .clone()
+                .or(theme.background)
+                .or(cfg.background),
             margin: cli.margin.or(cfg.margin).unwrap_or(0),
             width: cli.width.or(cfg.width),
-            format: pick(&cli.format, cfg.format, "term"),
+            format: pick(&cli.format, None, cfg.format, "term"),
             out: cli.out.clone(),
-            animate: pick(&cli.animate, cfg.animate, "none"),
+            animate: pick(&cli.animate, None, cfg.animate, "none"),
             fps: cli.fps.or(cfg.fps).unwrap_or(30),
             no_color: cli.no_color,
             lines: cli.lines,
             user_gradients: cfg.gradients,
-        }
+        })
     }
 }
 
@@ -529,6 +565,33 @@ fn print_man() -> Result<(), String> {
     std::io::stdout()
         .write_all(&buf)
         .map_err(|e| format!("failed to write man page: {e}"))
+}
+
+fn list_themes(cfg: &Config) {
+    println!("Built-in themes:\n");
+    for name in themes::builtin_names() {
+        print_theme(name, &themes::builtin(name).unwrap());
+    }
+    if !cfg.themes.is_empty() {
+        println!("\nYour themes (from config):\n");
+        let mut names: Vec<&String> = cfg.themes.keys().collect();
+        names.sort();
+        for name in names {
+            print_theme(name, &cfg.themes[name]);
+        }
+    }
+    println!("\nUse: sigil \"Text\" --theme <name>  (flags still override)");
+}
+
+fn print_theme(name: &str, t: &Theme) {
+    let parts = [
+        t.font.as_deref().map(|v| format!("font={v}")),
+        t.gradient.as_deref().map(|v| format!("gradient={v}")),
+        t.border.as_deref().map(|v| format!("border={v}")),
+        t.background.as_deref().map(|v| format!("bg={v}")),
+    ];
+    let desc: Vec<String> = parts.into_iter().flatten().collect();
+    println!("  {name:<11}  {}", desc.join("  "));
 }
 
 /// A tiny SplitMix64 PRNG — enough for picking a random font/gradient without

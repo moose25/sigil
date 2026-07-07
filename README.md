@@ -62,6 +62,7 @@ sigil "Angle" -g rainbow --angle 60 --cycle 2 # tilted, repeating palette
 sigil "Boxed" -g ocean --border round         # frame it in a box
 sigil "Surprise" --random                      # random font + gradient (--seed N to repeat)
 sigil --lines "deploy" "prod"                   # stack multiple banners in one frame
+sigil "Neo" --theme cyberpunk                   # a curated font+gradient+border+bg bundle
 sigil gradients                               # preview all presets
 sigil fonts                                   # preview all fonts
 sigil "plain" --no-color                      # respects NO_COLOR too
@@ -97,6 +98,10 @@ sigil "plain" --no-color                      # respects NO_COLOR too
 ### Gradients
 
 `sunset`, `ocean`, `fire`, `mint`, `grape`, `cyberpunk`, `gold`, `ice`, `vaporwave`, `rainbow`, `matrix`, `flamingo`, `mono` — or roll your own with `--colors`.
+
+### Themes
+
+Curated bundles of font + gradient + border + background: `cyberpunk`, `retro`, `terminal`, `fire`, `ocean`, `gold`. Apply one with `--theme <name>` (individual flags still override), define your own under `[themes.<name>]` in config, and list them with `sigil themes`.
 
 ### Fonts
 

@@ -16,6 +16,7 @@ pub mod fonts;
 pub mod gradient;
 pub mod render;
 pub mod text;
+pub mod themes;
 
 pub use color::{ColorMode, Rgb};
 pub use gradient::{Direction, Gradient};

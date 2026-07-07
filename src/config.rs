@@ -35,6 +35,8 @@ pub struct Config {
     pub format: Option<String>,
     /// User-defined named gradients: name -> list of hex stops.
     pub gradients: HashMap<String, Vec<String>>,
+    /// User-defined themes: name -> coordinated option bundle.
+    pub themes: HashMap<String, crate::themes::Theme>,
 }
 
 impl Config {
@@ -88,9 +90,12 @@ impl Config {
             fps,
             format,
         );
-        // Named gradients merge per-key (project entries override user entries).
+        // Named gradients and themes merge per-key (project entries win).
         for (name, stops) in other.gradients {
             self.gradients.insert(name, stops);
+        }
+        for (name, theme) in other.themes {
+            self.themes.insert(name, theme);
         }
     }
 }
@@ -119,6 +124,16 @@ mod tests {
     #[test]
     fn rejects_unknown_fields() {
         assert!(toml::from_str::<Config>("wobble = true\n").is_err());
+    }
+
+    #[test]
+    fn parses_user_themes() {
+        let cfg: Config =
+            toml::from_str("[themes.brandy]\nfont = \"slant\"\ngradient = \"gold\"\n").unwrap();
+        let t = cfg.themes.get("brandy").expect("theme present");
+        assert_eq!(t.font.as_deref(), Some("slant"));
+        assert_eq!(t.gradient.as_deref(), Some("gold"));
+        assert_eq!(t.border, None);
     }
 
     #[test]
