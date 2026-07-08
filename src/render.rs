@@ -726,7 +726,12 @@ fn svg_impl(
 
     for row in 0..grid.height {
         let y = (row as f32 + 0.8) * line_h;
-        s.push_str(&format!("<tspan x=\"0\" y=\"{y:.1}\">"));
+        // Pin every row to the exact grid width so box-drawing glyphs (whose
+        // advance can differ from the monospace cell) can't drift — otherwise
+        // the right border edge drifts out of line with the top/bottom corners.
+        s.push_str(&format!(
+            "<tspan x=\"0\" y=\"{y:.1}\" textLength=\"{w:.1}\" lengthAdjust=\"spacingAndGlyphs\">"
+        ));
         if animate {
             for col in 0..grid.width {
                 let ch = grid.chars[row][col];
@@ -1215,6 +1220,20 @@ mod tests {
         let count = |needle: &[u8]| bytes.windows(4).filter(|w| *w == needle).count();
         assert!(count(b"acTL") >= 1, "missing acTL (not animated)");
         assert_eq!(count(b"fcTL"), 6, "expected one fcTL per frame");
+    }
+
+    #[test]
+    fn svg_rows_pin_width_for_border_alignment() {
+        // Each row is length-adjusted to the exact grid width so box-drawing
+        // glyphs can't drift the right border out of line with the corners.
+        let b = Banner::layout(&font(), "Hi").unwrap();
+        let mut opts = base_opts(ColorMode::True);
+        opts.border = Border::parse("round").unwrap();
+        let svg = to_svg(&b, &opts, None);
+        let rows = svg.matches("<tspan x=\"0\"").count();
+        let pinned = svg.matches("lengthAdjust=\"spacingAndGlyphs\"").count();
+        assert!(rows > 0);
+        assert_eq!(rows, pinned, "every row must be length-pinned");
     }
 
     #[test]
