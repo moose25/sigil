@@ -12,7 +12,7 @@ use sigil::gradient::{Direction, Gradient, Interp};
 use sigil::render::{paint, Align, Banner, Border, ColorBy, RenderOptions};
 use sigil::themes::{self, Theme};
 
-/// Brand your project in seconds — gradient ASCII banners for your CLI,
+/// Brand your project in seconds - gradient ASCII banners for your CLI,
 /// README, or source code.
 #[derive(Parser)]
 #[command(name = "sigil", version, about, long_about = None)]
@@ -131,7 +131,7 @@ struct Cli {
     #[arg(long, value_name = "FILE")]
     art: Option<std::path::PathBuf>,
 
-    /// Prefix a small icon/emoji to the left of the banner, e.g. --icon "🚀".
+    /// Prefix a small icon/glyph to the left of the banner, e.g. --icon "*".
     #[arg(long, value_name = "GLYPH")]
     icon: Option<String>,
 
@@ -1043,7 +1043,7 @@ fn preview_font(
     gradient: &Gradient,
     mode: ColorMode,
 ) -> Result<(), String> {
-    println!("\n{} — {description}", bold(name, mode));
+    println!("\n{} - {description}", bold(name, mode));
     let font = fonts::load(name)?;
     let banner = Banner::layout(&font, "Sigil")?;
     let opts = RenderOptions {
@@ -1185,7 +1185,7 @@ fn show_config() -> Result<(), String> {
         shown += 1;
     }
     if shown == 0 {
-        println!("  (nothing set — sigil is using its built-in defaults)");
+        println!("  (nothing set - sigil is using its built-in defaults)");
     }
     Ok(())
 }
@@ -1228,7 +1228,7 @@ fn card_svg(text: &str, font_name: &str, gradient: Gradient) -> Result<String, S
 }
 
 /// Write a self-contained HTML gallery of `text` across fonts, gradients, and
-/// themes — a single page you can open in a browser or share.
+/// themes - a single page you can open in a browser or share.
 fn make_gallery(text_args: &[String], out: Option<&Path>) -> Result<(), String> {
     let text = if text_args.is_empty() {
         "Sigil".to_string()
@@ -1238,7 +1238,7 @@ fn make_gallery(text_args: &[String], out: Option<&Path>) -> Result<(), String> 
     let esc = html_escape(&text);
     let mut html = String::new();
     html.push_str(&format!(
-        "<!DOCTYPE html>\n<meta charset=\"utf-8\">\n<title>sigil gallery — {esc}</title>\n\
+        "<!DOCTYPE html>\n<meta charset=\"utf-8\">\n<title>sigil gallery - {esc}</title>\n\
          <style>body{{background:#0d1117;color:#c9d1d9;font-family:ui-sans-serif,system-ui,\
          Segoe UI,Roboto,sans-serif;margin:0;padding:32px}}h1{{font-weight:800}}\
          h2{{margin-top:40px;border-bottom:1px solid #30363d;padding-bottom:6px}}\
@@ -1505,7 +1505,7 @@ fn preview_theme(name: &str, t: &Theme, mode: ColorMode) -> Result<(), String> {
     Ok(())
 }
 
-/// A tiny SplitMix64 PRNG — enough for picking a random font/gradient without
+/// A tiny SplitMix64 PRNG - enough for picking a random font/gradient without
 /// pulling in an rng crate.
 struct SplitMix(u64);
 

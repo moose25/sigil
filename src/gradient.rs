@@ -11,7 +11,7 @@ pub enum Interp {
     Oklab,
     /// Straight sRGB component interpolation.
     Rgb,
-    /// HSL — rotates hue for a rainbow-ish transition.
+    /// HSL - rotates hue for a rainbow-ish transition.
     Hsl,
 }
 
@@ -218,7 +218,7 @@ impl Gradient {
 /// The axis along which the gradient sweeps across the banner.
 ///
 /// `Angle` is measured in degrees: 0° = left→right, 90° = top→bottom,
-/// 45° = diagonal — so the named variants are just convenient angles.
+/// 45° = diagonal - so the named variants are just convenient angles.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Direction {
     Horizontal,

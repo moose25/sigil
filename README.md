@@ -4,7 +4,7 @@
 
 <h1 align="center">sigil</h1>
 
-<p align="center"><strong>Brand your project in seconds.</strong><br>Turn any name into a gradient ASCII banner — then drop it straight into your CLI, README, or source code.</p>
+<p align="center"><strong>Brand your project in seconds.</strong><br>Turn any name into a gradient ASCII banner - then drop it straight into your CLI, README, or source code.</p>
 
 <p align="center">
   <a href="https://github.com/moose25/sigil/actions"><img src="https://img.shields.io/github/actions/workflow/status/moose25/sigil/ci.yml?branch=main&label=ci&logo=github" alt="CI"></a>
@@ -13,9 +13,9 @@
   <img src="https://img.shields.io/badge/deps-zero%20runtime-brightgreen.svg" alt="Zero runtime deps">
 </p>
 
-Give your project a look that's unmistakably *yours*. `sigil` takes a word, renders it as a FIGlet banner, and paints it with a smooth, perceptually-uniform gradient (blended in [Oklab](https://bottosson.github.io/posts/oklab/), so colors stay vivid instead of passing through muddy middles). Pick a font, a palette, a theme — then **export it in whatever format your project speaks**: a splash for your CLI's `--help`, a header for your README, a startup logo baked right into your source. One command, endlessly customizable.
+Give your project a look that's unmistakably *yours*. `sigil` takes a word, renders it as a FIGlet banner, and paints it with a smooth, perceptually-uniform gradient (blended in [Oklab](https://bottosson.github.io/posts/oklab/), so colors stay vivid instead of passing through muddy middles). Pick a font, a palette, a theme - then **export it in whatever format your project speaks**: a splash for your CLI's `--help`, a header for your README, a startup logo baked right into your source. One command, endlessly customizable.
 
-> 🪄 A single self-contained binary. No runtime dependencies. Every banner in this README was made with `sigil -F svg`.
+> A single self-contained binary. No runtime dependencies. Every banner in this README was made with `sigil -F svg`.
 
 **Contents:** [Install](#install) · [Quick start](#quick-start) · [Usage](#usage) · [Embed in your own tool](#embed-in-your-own-tool) · [Config](#config) · [Development](#development)
 
@@ -47,7 +47,7 @@ sigil demo                     # see a showcase of fonts, gradients, and effects
 ## Gallery
 
 **As simple or as elaborate as you like.** Reach for one flat color and a small
-font, or pile on a gradient, a frame, a theme, and effects — sigil scales from a
+font, or pile on a gradient, a frame, a theme, and effects - sigil scales from a
 quiet mark to a full statement. Here's the same word at three levels of styling,
 in a single image:
 
@@ -104,26 +104,26 @@ sigil "shimmer" -g fire --animate sweep -F png -o banner.png  # animated PNG (AP
 
 ```sh
 sigil "Hello" --gradient ocean --direction diagonal --align center
-sigil "Ship it" --colors "#ff5f6d,#ffc371"   # custom gradient stops
-sigil "Brandy" --from "#ff5f6d"              # a gradient from one brand color
-sigil "Deploy" --font ansishadow             # pick a font
-echo "From stdin" | sigil                     # or pipe the text in
-sigil --art cat.txt -g rainbow                # colorize existing ASCII art
-sigil "Launching" -g fire --animate sweep     # animated shimmer (TTY only)
-sigil "Ready" --animate type --fps 60         # typewriter reveal
-sigil "Angle" -g rainbow --angle 60 --cycle 2 # tilted, repeating palette
-sigil "Boxed" -g ocean --border round         # frame it in a box
-sigil "Deploy" --icon "🚀" -g fire            # a small icon beside the wordmark
-sigil "Acme" --subtitle "ship faster" -f big  # a logo with a smaller tagline
+sigil "Ship it" --colors "#ff5f6d,#ffc371"     # custom gradient stops
+sigil "Brandy" --from "#ff5f6d"                # a gradient from one brand color
+sigil "Deploy" --font ansishadow               # pick a font
+echo "From stdin" | sigil                      # or pipe the text in
+sigil --art cat.txt -g rainbow                 # colorize existing ASCII art
+sigil "Launching" -g fire --animate sweep      # animated shimmer (TTY only)
+sigil "Ready" --animate type --fps 60          # typewriter reveal
+sigil "Angle" -g rainbow --angle 60 --cycle 2  # tilted, repeating palette
+sigil "Boxed" -g ocean --border round          # frame it in a box
+sigil "Deploy" --icon "*" -g fire              # a small icon beside the wordmark
+sigil "Acme" --subtitle "ship faster" -f big   # a logo with a smaller tagline
 sigil "Surprise" --random                      # random font + gradient (--seed N to repeat)
-sigil --lines "deploy" "prod"                   # stack multiple banners in one frame
-sigil "A long project tagline" --wrap 60        # word-wrap long text to fit 60 cols
-sigil "Neo" --theme cyberpunk                   # a curated font+gradient+border+bg bundle
+sigil --lines "deploy" "prod"                  # stack multiple banners in one frame
+sigil "A long project tagline" --wrap 60       # word-wrap long text to fit 60 cols
+sigil "Neo" --theme cyberpunk                  # a curated font+gradient+border+bg bundle
 sigil mark "acme" -g aurora -o mark.svg        # a unique geometric logo from a name
 sigil gallery "Acme" -o gallery.html           # a page of your text in every style
-sigil gradients                               # preview all presets
-sigil fonts                                   # preview all fonts
-sigil "plain" --no-color                      # respects NO_COLOR too
+sigil gradients                                # preview all presets
+sigil fonts                                    # preview all fonts
+sigil "plain" --no-color                       # respects NO_COLOR too
 sigil "Docs" -F markdown                       # a fenced code block for READMEs
 ```
 
@@ -132,52 +132,52 @@ sigil "Docs" -F markdown                       # a fenced code block for READMEs
 | Flag | Description | Default |
 | ---- | ----------- | ------- |
 | `-g, --gradient <name>` | Named preset (see `sigil gradients`) | `ocean` |
-| `-c, --colors <hex,...>` | Custom gradient stops (optional `@pos`, e.g. `#000@0,#fff@0.8`) | — |
-| `--from <hex>` | Derive a gradient from one brand color (overridden by `--colors`) | — |
-| `--gradient-file <file>` | Load stops from a palette file (hex-per-line or GIMP `.gpl`) | — |
+| `-c, --colors <hex,...>` | Custom gradient stops (optional `@pos`, e.g. `#000@0,#fff@0.8`) | - |
+| `--from <hex>` | Derive a gradient from one brand color (overridden by `--colors`) | - |
+| `--gradient-file <file>` | Load stops from a palette file (hex-per-line or GIMP `.gpl`) | - |
 | `-d, --direction <dir>` | `horizontal` \| `vertical` \| `diagonal` \| `radial` \| `conic` | `horizontal` |
-| `--angle <deg>` | Sweep angle in degrees (overrides `--direction`) | — |
+| `--angle <deg>` | Sweep angle in degrees (overrides `--direction`) | - |
 | `--color-by <mode>` | `banner` \| `line` \| `char` (per-line / per-glyph coloring) | `banner` |
 | `--fill <mode>` | `glyph` \| `shade` (block-shade ░▒▓█ by brightness, reads without color) | `glyph` |
 | `--interpolate <space>` | Blend space: `oklab` \| `rgb` \| `hsl` | `oklab` |
-| `--reverse` | Flip the gradient direction | — |
+| `--reverse` | Flip the gradient direction | - |
 | `--cycle <n>` | Repeat the palette N times across the banner | `1` |
 | `-b, --border <style>` | `none` \| `round` \| `single` \| `double` \| `heavy` \| `ascii` | `none` |
 | `-p, --padding <n>` | Interior padding inside the frame | `1` (with border) |
-| `--pad-x <n>` / `--pad-y <n>` | Horizontal/vertical padding (override `--padding` per axis) | — |
-| `--title <text>` | Caption embedded in the top border | — |
-| `--border-color <hex>` | Solid frame color (default: share the gradient) | — |
-| `--background <hex>` | Solid background fill behind the banner (alias `--bg`) | — |
-| `--bg-gradient <spec>` | Gradient background (preset name or `hex,hex,…`) | — |
-| `--shadow` | Draw a drop shadow behind the glyphs | — |
+| `--pad-x <n>` / `--pad-y <n>` | Horizontal/vertical padding (override `--padding` per axis) | - |
+| `--title <text>` | Caption embedded in the top border | - |
+| `--border-color <hex>` | Solid frame color (default: share the gradient) | - |
+| `--background <hex>` | Solid background fill behind the banner (alias `--bg`) | - |
+| `--bg-gradient <spec>` | Gradient background (preset name or `hex,hex,…`) | - |
+| `--shadow` | Draw a drop shadow behind the glyphs | - |
 | `--shadow-color <hex>` | Shadow color | dark gray |
-| `--outline` | Draw an outline (halo) around the glyphs | — |
+| `--outline` | Draw an outline (halo) around the glyphs | - |
 | `--outline-color <hex>` | Outline color | near-black |
 | `-a, --align <align>` | `left` \| `center` \| `right` | `left` |
 | `-f, --font <name>` | Font (see `sigil fonts`) | `standard` |
-| `--icon <glyph>` | Prefix a small icon/emoji to the left of the banner | — |
-| `--letter-spacing <n>` | Extra blank columns between glyphs (airier look) | — |
-| `--subtitle <text>` | A smaller tagline stacked beneath the banner | — |
+| `--icon <glyph>` | Prefix a small icon/emoji to the left of the banner | - |
+| `--letter-spacing <n>` | Extra blank columns between glyphs (airier look) | - |
+| `--subtitle <text>` | A smaller tagline stacked beneath the banner | - |
 | `--subtitle-font <name>` | Font for the subtitle line | `small` |
-| `--fit <cols>` | Auto-pick the boldest bundled font whose banner fits N columns (overrides `--font`) | — |
+| `--fit <cols>` | Auto-pick the boldest bundled font whose banner fits N columns (overrides `--font`) | - |
 | `-w, --width <cols>` | Target width for alignment | terminal width |
-| `--min-width <cols>` | Pad the banner box out to at least N columns (centered) | — |
-| `--wrap <cols>` | Word-wrap long text so each rendered line fits within N columns (alias `--max-width`) | — |
+| `--min-width <cols>` | Pad the banner box out to at least N columns (centered) | - |
+| `--wrap <cols>` | Word-wrap long text so each rendered line fits within N columns (alias `--max-width`) | - |
 | `-m, --margin <n>` | Blank lines above/below | `0` |
 | `--margin-x <n>` | Left indent in columns (on top of alignment) | `0` |
 | `-F, --format <fmt>` | `term` \| `ansi` \| `raw` \| `rust` \| `go` \| `python` \| `js` \| `ts` \| `c` \| `cpp` \| `ruby` \| `shell` \| `svg` \| `html` \| `png` \| `json` | `term` |
-| `-o, --out <file>` | Write to a file instead of stdout | — |
+| `-o, --out <file>` | Write to a file instead of stdout | - |
 | `--animate <style>` | `none` \| `sweep` \| `type` \| `pulse` \| `scroll` (terminal only) | `none` |
 | `--fps <n>` | Animation speed, 1–120 | `30` |
-| `-l, --lines` | Stack each input line/argument as its own banner | — |
-| `--random` | Random font + gradient for anything unset | — |
-| `--seed <n>` | Seed for `--random` (reproducible) | — |
-| `--copy` | Also copy the output to the system clipboard | — |
-| `--no-color` | Disable color | — |
+| `-l, --lines` | Stack each input line/argument as its own banner | - |
+| `--random` | Random font + gradient for anything unset | - |
+| `--seed <n>` | Seed for `--random` (reproducible) | - |
+| `--copy` | Also copy the output to the system clipboard | - |
+| `--no-color` | Disable color | - |
 
 ### Gradients
 
-`sunset`, `ocean`, `fire`, `mint`, `grape`, `cyberpunk`, `gold`, `ice`, `vaporwave`, `rainbow`, `matrix`, `flamingo`, `mono`, `aurora`, `lava`, `neon`, `pastel`, `dusk`, `berry`, `steel`, `forest`, `coral`, `glacier`, `nebula`, `moss`, `peach`, `twilight` — or roll your own with `--colors`.
+`sunset`, `ocean`, `fire`, `mint`, `grape`, `cyberpunk`, `gold`, `ice`, `vaporwave`, `rainbow`, `matrix`, `flamingo`, `mono`, `aurora`, `lava`, `neon`, `pastel`, `dusk`, `berry`, `steel`, `forest`, `coral`, `glacier`, `nebula`, `moss`, `peach`, `twilight` - or roll your own with `--colors`.
 
 ### Themes
 
@@ -185,13 +185,13 @@ Curated bundles of font + gradient + border + background (+ shadow/outline): `cy
 
 ### Fonts
 
-`standard`, `ansishadow`, `slant`, `big`, `small`, `doom`, `bloody`, `3d`, `ansiregular`, `ghost` (with aliases like `shadow`, `italic`, `mini`, `ansi`). Run `sigil fonts` for a live preview. Bundled fonts are embedded in the binary — see [src/fonts/NOTICE.md](src/fonts/NOTICE.md) for attribution.
+`standard`, `ansishadow`, `slant`, `big`, `small`, `doom`, `bloody`, `3d`, `ansiregular`, `ghost` (with aliases like `shadow`, `italic`, `mini`, `ansi`). Run `sigil fonts` for a live preview. Bundled fonts are embedded in the binary - see [src/fonts/NOTICE.md](src/fonts/NOTICE.md) for attribution.
 
-**Custom fonts:** pass a path to any FIGlet font — `sigil "Hi" -f ./cool.flf` — or drop `.flf` files in `~/.config/sigil/fonts/` and use them by name (`-f cool`). They show up in `sigil fonts` too. Code-tagged glyphs are trimmed automatically so most fonts "just work."
+**Custom fonts:** pass a path to any FIGlet font - `sigil "Hi" -f ./cool.flf` - or drop `.flf` files in `~/.config/sigil/fonts/` and use them by name (`-f cool`). They show up in `sigil fonts` too. Code-tagged glyphs are trimmed automatically so most fonts "just work."
 
 ## Embed in your own tool
 
-Generate a banner once and paste it into your project — a splash for `--help`, a startup logo, a script header. `--format` emits ready-to-use output:
+Generate a banner once and paste it into your project - a splash for `--help`, a startup logo, a script header. `--format` emits ready-to-use output:
 
 ```sh
 sigil "Acme" -g sunset -F rust   > src/banner.rs   # pub const BANNER: &str = ...
@@ -212,9 +212,9 @@ sigil "Acme" -g sunset -F png --scale 3 -o big.png   # 3x-resolution PNG
 ```
 
 `-F svg` produces a self-contained SVG (colored monospace grid on a dark
-backdrop) — drop it straight into a README or docs. Add `--animate sweep` for an
+backdrop) - drop it straight into a README or docs. Add `--animate sweep` for an
 **animated** SVG whose gradient shimmers in the browser (no gif tooling needed).
-`-F png` writes a raster image (one color block per cell — crisp, font-free, and
+`-F png` writes a raster image (one color block per cell - crisp, font-free, and
 best with block fonts like `ansishadow`/`ansiregular`).
 
 The `rust`/`go`/`python`/`js`/`ts`/`c`/`cpp`/`ruby` snippets define a `BANNER` constant (with a comment showing how to print it); `shell` is a runnable heredoc. Color is baked into every snippet format. Use `-o <file>` instead of a shell redirect if you prefer.
@@ -279,12 +279,12 @@ cargo run -- "Hi"    # try it
 
 Contributions welcome. The codebase is small and modular:
 
-- `color` — sRGB/Oklab math and ANSI escapes
-- `gradient` — presets, sampling, interpolation spaces
-- `fonts` — bundled + custom FIGlet fonts
-- `render` — layout, the cell grid, effects, and the SVG/HTML/PNG/JSON renderers
-- `animate` — terminal animations
-- `text` / `config` / `themes` / `export` — input folding, config, themes, formats
+- `color` - sRGB/Oklab math and ANSI escapes
+- `gradient` - presets, sampling, interpolation spaces
+- `fonts` - bundled + custom FIGlet fonts
+- `render` - layout, the cell grid, effects, and the SVG/HTML/PNG/JSON renderers
+- `animate` - terminal animations
+- `text` / `config` / `themes` / `export` - input folding, config, themes, formats
 
 The README's showcase images are regenerated from sigil itself with
 `bash assets/generate.sh` (it shells out to `sigil -F svg` and stacks a few
@@ -296,4 +296,4 @@ milestone. See [CHANGELOG.md](CHANGELOG.md) for the feature history.
 ## License
 
 [MIT](LICENSE) © Chris Williams. Bundled FIGlet fonts retain their original
-permissive licenses — see [src/fonts/NOTICE.md](src/fonts/NOTICE.md).
+permissive licenses - see [src/fonts/NOTICE.md](src/fonts/NOTICE.md).

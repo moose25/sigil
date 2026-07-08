@@ -2,14 +2,14 @@
 //! ready-to-paste snippet for another language.
 //!
 //! The snippet formats let you generate a banner once and embed it directly in
-//! your own tool's source — a splash for `--help`, a startup logo, etc.
+//! your own tool's source - a splash for `--help`, a startup logo, etc.
 
 /// A target output format for a rendered banner.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Format {
     /// Colored terminal output (color auto-detected: on for a TTY, off when piped).
     Term,
-    /// Raw ANSI string, color forced on — for capturing colored bytes.
+    /// Raw ANSI string, color forced on - for capturing colored bytes.
     Ansi,
     /// Plain glyphs, no color.
     Raw,
