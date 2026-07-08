@@ -166,7 +166,7 @@ impl Banner {
     /// Words are kept whole and packed greedily; a single word that renders
     /// wider than `max_width` still gets its own line (we never split a word
     /// mid-glyph). Wrapping is measured against the *rendered* banner width, so
-    /// it accounts for the font — not the raw character count.
+    /// it accounts for the font - not the raw character count.
     pub fn layout_wrapped(font: &FIGfont, text: &str, max_width: usize) -> Result<Banner, String> {
         let words: Vec<&str> = text.split_whitespace().collect();
         if words.is_empty() {
@@ -269,7 +269,7 @@ impl Banner {
     /// Stack `bottom` beneath `top` into one banner, each centered within the
     /// wider of the two, separated by `gap` blank rows.
     ///
-    /// The two can come from different fonts — this is how a large headline and
+    /// The two can come from different fonts - this is how a large headline and
     /// a smaller subtitle become a single unit that shares one gradient, border,
     /// and animation.
     pub fn stacked(top: &Banner, bottom: &Banner, gap: usize) -> Banner {
@@ -294,7 +294,7 @@ impl Banner {
 
     /// Prepend a small icon (an emoji or Nerd Font glyph) to the left of the
     /// banner, vertically centered, with `gap` blank columns between it and the
-    /// text. The glyph renders at the terminal's normal cell size — an icon
+    /// text. The glyph renders at the terminal's normal cell size - an icon
     /// beside a wordmark. A zero-width icon is ignored.
     pub fn with_icon(mut self, icon: &str, gap: usize) -> Banner {
         let iw = display_width(icon);
@@ -373,7 +373,7 @@ pub struct Grid {
     pub height: usize,
 }
 
-/// Drop-shadow offset (columns, rows) — down and to the right.
+/// Drop-shadow offset (columns, rows) - down and to the right.
 const SHADOW: (usize, usize) = (1, 1);
 
 /// Composite a banner (with padding, frame, shadow, outline, title) into a
@@ -552,8 +552,8 @@ pub fn cell_color(grid: &Grid, opts: &RenderOptions, row: usize, col: usize, pha
     opts.gradient.sample(t)
 }
 
-/// Pick a block-shade glyph for a color by its brightness — `░` for dim up to
-/// `█` for bright — so a gradient reads as varying density even without color.
+/// Pick a block-shade glyph for a color by its brightness - `░` for dim up to
+/// `█` for bright - so a gradient reads as varying density even without color.
 pub fn shade_glyph(c: Rgb) -> char {
     const BLOCKS: [char; 4] = ['░', '▒', '▓', '█'];
     let lum = (0.299 * c.r as f32 + 0.587 * c.g as f32 + 0.114 * c.b as f32) / 255.0;
@@ -578,7 +578,7 @@ fn shaded(
     }
 }
 
-/// Background color for a cell when `background_gradient` is set — sampled along
+/// Background color for a cell when `background_gradient` is set - sampled along
 /// the sweep direction across the whole box, honoring reverse/cycle. Returns
 /// `None` when there is no background gradient (callers fall back to the solid
 /// background or leave the cell bare).
@@ -671,7 +671,7 @@ pub fn to_svg(banner: &Banner, opts: &RenderOptions, background: Option<Rgb>) ->
 }
 
 /// Like [`to_svg`], but the gradient shimmers via SMIL animation (a browser /
-/// GitHub renders it as a looping animated banner — no gif tooling needed).
+/// GitHub renders it as a looping animated banner - no gif tooling needed).
 pub fn to_svg_animated(banner: &Banner, opts: &RenderOptions, background: Option<Rgb>) -> String {
     svg_impl(banner, opts, background, true)
 }
@@ -727,7 +727,7 @@ fn svg_impl(
     for row in 0..grid.height {
         let y = (row as f32 + 0.8) * line_h;
         // Pin every row to the exact grid width so box-drawing glyphs (whose
-        // advance can differ from the monospace cell) can't drift — otherwise
+        // advance can differ from the monospace cell) can't drift - otherwise
         // the right border edge drifts out of line with the top/bottom corners.
         s.push_str(&format!(
             "<tspan x=\"0\" y=\"{y:.1}\" textLength=\"{w:.1}\" lengthAdjust=\"spacingAndGlyphs\">"

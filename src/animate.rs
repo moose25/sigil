@@ -2,7 +2,7 @@
 //!
 //! Animations only run on a real TTY (the caller checks). Each frame is drawn
 //! in place by moving the cursor back up over the banner and repainting, so no
-//! alternate screen or raw mode is needed — and nothing to restore if the user
+//! alternate screen or raw mode is needed - and nothing to restore if the user
 //! hits Ctrl-C.
 //!
 //! Frames reuse [`crate::render`]'s grid and per-cell coloring, so borders,
@@ -23,7 +23,7 @@ pub enum Anim {
     Sweep,
     /// A left-to-right typewriter reveal, column by column.
     Type,
-    /// A brightness pulse — the banner breathes between dim and full.
+    /// A brightness pulse - the banner breathes between dim and full.
     Pulse,
     /// A marquee that scrolls the banner horizontally.
     Scroll,

@@ -4,7 +4,7 @@ All notable changes to sigil are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 [Semantic Versioning](https://semver.org/).
 
-## [0.3.0] — 2026-07-07
+## [0.3.0] - 2026-07-07
 
 A large feature release focused on **branding your project**: deriving looks
 from a single color, richer typography, more output targets, and a couple of
@@ -23,7 +23,7 @@ signature capabilities.
 
 ### Typography & layout
 
-- `--subtitle <text>` / `--subtitle-font` — a logo with a smaller tagline in one render.
+- `--subtitle <text>` / `--subtitle-font` - a logo with a smaller tagline in one render.
 - `--wrap <cols>` word-wraps long text to fit N columns.
 - `--fit <cols>` auto-picks the boldest bundled font that fits.
 - `--letter-spacing <n>` for an airier look.
@@ -36,10 +36,10 @@ signature capabilities.
 - Animated PNG (APNG) export: `-F png --animate sweep`.
 - New snippet targets: `-F js | ts | c | cpp | ruby`, plus `-F markdown`.
 - `--func` emits a `print_banner()` function instead of a bare constant.
-- `sigil mark` — a deterministic generative geometric logo from a string.
-- `sigil gallery` — a self-contained HTML page of your text in every style.
-- `sigil random` — a surprise combo plus the exact flags to reproduce it.
-- `sigil config path | show` — inspect config files and effective settings.
+- `sigil mark` - a deterministic generative geometric logo from a string.
+- `sigil gallery` - a self-contained HTML page of your text in every style.
+- `sigil random` - a surprise combo plus the exact flags to reproduce it.
+- `sigil config path | show` - inspect config files and effective settings.
 - `sigil themes` now previews each theme as a live mini-banner.
 - `cargo binstall sigil` support via `[package.metadata.binstall]`.
 
@@ -48,7 +48,7 @@ signature capabilities.
 - Reframed the project around "brand your project in seconds," with a
   simple→elaborate showcase gallery in the README.
 
-## [0.2.0] — 2026-07-07
+## [0.2.0] - 2026-07-07
 
 ### Added
 
@@ -56,7 +56,7 @@ signature capabilities.
 - Horizontal margin: `--margin-x` (left indent, complements the vertical `--margin`).
 - Minimum width: `--min-width` pads the box out to at least N columns (centered).
 
-## [0.1.0] — 2026-07-07
+## [0.1.0] - 2026-07-07
 
 The initial release. Built up across seven development milestones.
 

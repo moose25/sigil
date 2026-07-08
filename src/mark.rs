@@ -1,4 +1,4 @@
-//! Generative "sigil" marks — a deterministic geometric emblem derived from a
+//! Generative "sigil" marks - a deterministic geometric emblem derived from a
 //! string. The same input always yields the same mirror-symmetric mark, painted
 //! with a gradient; a quick, unique logo when you don't have one.
 
@@ -19,7 +19,7 @@ impl Rng {
     }
 }
 
-/// FNV-1a hash of the (trimmed) input — seeds the mark deterministically.
+/// FNV-1a hash of the (trimmed) input - seeds the mark deterministically.
 fn seed_of(text: &str) -> u64 {
     let mut h: u64 = 0xcbf2_9ce4_8422_2325;
     for b in text.trim().bytes() {

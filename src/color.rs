@@ -129,7 +129,7 @@ pub enum ColorMode {
     True,
     /// 256-color palette (approximated).
     Ansi256,
-    /// No color at all — plain glyphs.
+    /// No color at all - plain glyphs.
     None,
 }
 

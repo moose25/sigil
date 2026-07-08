@@ -75,6 +75,7 @@ mod tests {
     #[test]
     fn unrenderable_becomes_placeholder() {
         assert_eq!(sanitize("日本"), "??");
-        assert_eq!(sanitize("Hi👋"), "Hi?");
+        // A wave emoji (written as an escape so no literal emoji lives in source).
+        assert_eq!(sanitize("Hi\u{1f44b}"), "Hi?");
     }
 }

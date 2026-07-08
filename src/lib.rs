@@ -1,4 +1,4 @@
-//! sigil — modern gradient ASCII banners for your projects.
+//! sigil - modern gradient ASCII banners for your projects.
 //!
 //! The library is split into small pieces:
 //! - [`color`]: sRGB/Oklab math and ANSI escape generation

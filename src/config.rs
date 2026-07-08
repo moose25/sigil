@@ -157,7 +157,7 @@ pub fn user_config_path() -> Option<PathBuf> {
 
 /// A commented starter config, written by `sigil init`.
 pub const STARTER: &str = "\
-# sigil config — https://github.com/moose25/sigil
+# sigil config - https://github.com/moose25/sigil
 # Every option is optional; CLI flags override these. Uncomment to use.
 
 # --- color ---
@@ -195,11 +195,11 @@ pub const STARTER: &str = "\
 # fps     = 30
 # scale   = 1                    # PNG resolution multiplier (1-10)
 
-# Your own named gradients — use with `-g brand`:
+# Your own named gradients - use with `-g brand`:
 # [gradients]
 # brand = [\"#0f2027\", \"#203a43\", \"#2c5364\"]
 
-# Your own themes — use with `--theme mine`:
+# Your own themes - use with `--theme mine`:
 # [themes.mine]
 # font = \"slant\"
 # gradient = \"gold\"
